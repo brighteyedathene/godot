@@ -45,6 +45,9 @@ public:
 		ACTION_MODE_BUTTON_RELEASE,
 	};
 
+	void set_hovering(bool p_hovering);
+	void gui_input_native(const Ref<InputEvent> &p_event);
+
 private:
 	BitField<MouseButtonMask> button_mask = MouseButtonMask::LEFT;
 	bool toggle_mode = false;
