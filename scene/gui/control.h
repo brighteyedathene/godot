@@ -530,6 +530,10 @@ public:
 	void set_focus_neighbor(Side p_side, const NodePath &p_neighbor);
 	NodePath get_focus_neighbor(Side p_side) const;
 
+	// I want to expose the neighbour finding thing that only the internal ui navigation has.
+	Control *get_focus_neighbor_native(Side p_side);
+
+
 	void set_focus_next(const NodePath &p_next);
 	NodePath get_focus_next() const;
 	void set_focus_previous(const NodePath &p_prev);

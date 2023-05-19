@@ -397,6 +397,7 @@ Vector<AudioFrame> AudioStreamPlayer3D::_update_panning() {
 
 	PhysicsDirectSpaceState3D *space_state = PhysicsServer3D::get_singleton()->space_get_direct_state(world_3d->get_space());
 
+
 	for (Camera3D *camera : cameras) {
 		if (!camera) {
 			continue;
@@ -469,7 +470,9 @@ Vector<AudioFrame> AudioStreamPlayer3D::_update_panning() {
 		_calc_output_vol(local_pos.normalized(), tightness, output_volume_vector);
 
 		for (unsigned int k = 0; k < 4; k++) {
-			output_volume_vector.write[k] = multiplier * output_volume_vector[k];
+			const AudioFrame &prev_sample = output_volume_vector[k];
+			AudioFrame new_sample = output_volume_vector[k] * multiplier;
+			output_volume_vector.write[k] = AudioFrame(MAX(prev_sample.l, new_sample.l), MAX(prev_sample.r, new_sample.r));
 		}
 
 		HashMap<StringName, Vector<AudioFrame>> bus_volumes;

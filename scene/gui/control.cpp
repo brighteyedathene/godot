@@ -2126,6 +2126,11 @@ NodePath Control::get_focus_neighbor(Side p_side) const {
 	return data.focus_neighbor[p_side];
 }
 
+Control* Control::get_focus_neighbor_native(Side p_side){
+	return _get_focus_neighbor(p_side, 0);
+}
+
+
 void Control::set_focus_next(const NodePath &p_next) {
 	data.focus_next = p_next;
 }
@@ -3257,6 +3262,8 @@ void Control::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_focus_neighbor", "side", "neighbor"), &Control::set_focus_neighbor);
 	ClassDB::bind_method(D_METHOD("get_focus_neighbor", "side"), &Control::get_focus_neighbor);
+
+	ClassDB::bind_method(D_METHOD("get_focus_neighbor_native", "side"), &Control::get_focus_neighbor_native);
 
 	ClassDB::bind_method(D_METHOD("set_focus_next", "next"), &Control::set_focus_next);
 	ClassDB::bind_method(D_METHOD("get_focus_next"), &Control::get_focus_next);
