@@ -376,6 +376,13 @@ Vector<AudioFrame> AudioStreamPlayer3D::_update_panning() {
 		frame = AudioFrame(0, 0);
 	}
 
+	// I use this to store the volume for the previous camera
+	Vector<AudioFrame> previous_volume_vector;
+	previous_volume_vector.resize(4);
+	for (AudioFrame &frame : previous_volume_vector) {
+		frame = AudioFrame(0, 0);
+	}
+
 	if (!active.is_set() || stream.is_null()) {
 		return output_volume_vector;
 	}
@@ -470,9 +477,11 @@ Vector<AudioFrame> AudioStreamPlayer3D::_update_panning() {
 		_calc_output_vol(local_pos.normalized(), tightness, output_volume_vector);
 
 		for (unsigned int k = 0; k < 4; k++) {
-			const AudioFrame &prev_sample = output_volume_vector[k];
+			const AudioFrame &prev_sample = previous_volume_vector[k];
 			AudioFrame new_sample = output_volume_vector[k] * multiplier;
 			output_volume_vector.write[k] = AudioFrame(MAX(prev_sample.l, new_sample.l), MAX(prev_sample.r, new_sample.r));
+
+			previous_volume_vector.write[k] = output_volume_vector[k];
 		}
 
 		HashMap<StringName, Vector<AudioFrame>> bus_volumes;
