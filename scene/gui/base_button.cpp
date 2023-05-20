@@ -55,6 +55,11 @@ void BaseButton::_unpress_group() {
 
 void BaseButton::set_hovering(bool p_hovering) {
 	status.hovering = p_hovering;
+	// if we move off the button, unpress it. This is normally handled in gui input i think
+	if (!p_hovering) {
+		status.pressing_inside = false;
+		status.press_attempt = false;
+	}
 	queue_redraw();
 }
 
