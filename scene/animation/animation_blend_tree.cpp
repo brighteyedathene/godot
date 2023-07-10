@@ -208,6 +208,118 @@ AnimationNodeAnimation::AnimationNodeAnimation() {
 
 ////////////////////////////////////////////////////////
 
+String AnimationNodeAnimationPose::get_caption() const {
+	return "AnimationPose";
+}
+
+double AnimationNodeAnimationPose::process(double p_time, bool p_seek, bool p_is_external_seeking) {
+	AnimationPlayer *ap = state->player;
+	ERR_FAIL_COND_V(!ap, 0);
+
+	double cur_time = get_parameter(time);
+
+	if (!ap->has_animation(animation)) {
+		AnimationNodeBlendTree *tree = Object::cast_to<AnimationNodeBlendTree>(parent);
+		if (tree) {
+			String node_name = tree->get_node_name(Ref<AnimationNodeAnimation>(this));
+			make_invalid(vformat(RTR("On BlendTree node '%s', animation not found: '%s'"), node_name, animation));
+
+		} else {
+			make_invalid(vformat(RTR("Animation not found: '%s'"), animation));
+		}
+
+		return 0;
+	}
+
+	Ref<Animation> anim = ap->get_animation(animation);
+	double anim_size = (double)anim->get_length();
+	double step = 0.0;
+	double prev_time = cur_time;
+	Animation::LoopedFlag looped_flag = Animation::LOOPED_FLAG_NONE;
+	bool node_backward = play_mode == PLAY_MODE_BACKWARD;
+
+	if (p_seek) {
+		// Step must always be zero! I don't want any notifies
+		step = p_time - cur_time;
+		cur_time = p_time;
+	} else {
+		p_time *= backward ? -1.0 : 1.0;
+		cur_time = cur_time + p_time;
+		step = p_time;
+	}
+
+	if (anim->get_loop_mode() == Animation::LOOP_PINGPONG) {
+		if (!Math::is_zero_approx(anim_size)) {
+			if (prev_time >= 0 && cur_time < 0) {
+				backward = !backward;
+				looped_flag = node_backward ? Animation::LOOPED_FLAG_END : Animation::LOOPED_FLAG_START;
+			}
+			if (prev_time <= anim_size && cur_time > anim_size) {
+				backward = !backward;
+				looped_flag = node_backward ? Animation::LOOPED_FLAG_START : Animation::LOOPED_FLAG_END;
+			}
+			cur_time = Math::pingpong(cur_time, anim_size);
+		}
+	} else if (anim->get_loop_mode() == Animation::LOOP_LINEAR) {
+		if (!Math::is_zero_approx(anim_size)) {
+			if (prev_time >= 0 && cur_time < 0) {
+				looped_flag = node_backward ? Animation::LOOPED_FLAG_END : Animation::LOOPED_FLAG_START;
+			}
+			if (prev_time <= anim_size && cur_time > anim_size) {
+				looped_flag = node_backward ? Animation::LOOPED_FLAG_START : Animation::LOOPED_FLAG_END;
+			}
+			cur_time = Math::fposmod(cur_time, anim_size);
+		}
+		backward = false;
+	} else {
+		if (cur_time < 0) {
+			step += cur_time;
+			cur_time = 0;
+		} else if (cur_time > anim_size) {
+			step += anim_size - cur_time;
+			cur_time = anim_size;
+		}
+		backward = false;
+
+		// If ended, don't progress animation. So set delta to 0.
+		if (p_time > 0) {
+			if (play_mode == PLAY_MODE_FORWARD) {
+				if (prev_time >= anim_size) {
+					step = 0;
+				}
+			} else {
+				if (prev_time <= 0) {
+					step = 0;
+				}
+			}
+		}
+
+		// Emit start & finish signal. Internally, the detections are the same for backward.
+		// We should use call_deferred since the track keys are still being prosessed.
+		if (state->tree) {
+			// AnimationTree uses seek to 0 "internally" to process the first key of the animation, which is used as the start detection.
+			if (p_seek && !p_is_external_seeking && cur_time == 0) {
+				state->tree->call_deferred(SNAME("emit_signal"), "animation_started", animation);
+			}
+			// Finished.
+			if (prev_time < anim_size && cur_time >= anim_size) {
+				state->tree->call_deferred(SNAME("emit_signal"), "animation_finished", animation);
+			}
+		}
+	}
+
+	if (play_mode == PLAY_MODE_FORWARD) {
+		blend_animation(animation, cur_time, 0/*step*/, p_seek, p_is_external_seeking, 1.0, looped_flag);
+	} else {
+		blend_animation(animation, anim_size - cur_time, 0/*-step*/, p_seek, p_is_external_seeking, 1.0, looped_flag);
+	}
+	set_parameter(time, cur_time);
+
+	return anim_size - cur_time;
+}
+
+////////////////////////////////////////////////////////
+
 void AnimationNodeSync::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_use_sync", "enable"), &AnimationNodeSync::set_use_sync);
 	ClassDB::bind_method(D_METHOD("is_using_sync"), &AnimationNodeSync::is_using_sync);
@@ -640,6 +752,27 @@ void AnimationNodeTimeSeek::_bind_methods() {
 
 AnimationNodeTimeSeek::AnimationNodeTimeSeek() {
 	add_input("in");
+}
+
+/////////////////////////////////////////////////
+
+String AnimationNodeTimeSeekFake::get_caption() const {
+	return "TimeSeekFake";
+}
+
+double AnimationNodeTimeSeekFake::process(double p_time, bool p_seek, bool p_is_external_seeking) {
+	/* Basically identical except I always set p_seek to false. Hopefully this will let me skip event notifies
+	*/
+	double cur_seek_pos = get_parameter(seek_pos_request);
+	if (p_seek) {
+		return blend_input(0, p_time, false, p_is_external_seeking, 1.0, FILTER_IGNORE, true);
+	} else if (cur_seek_pos >= 0) {
+		double ret = blend_input(0, cur_seek_pos, false, true, 1.0, FILTER_IGNORE, true);
+		set_parameter(seek_pos_request, -1.0); // Reset.
+		return ret;
+	} else {
+		return blend_input(0, p_time, false, p_is_external_seeking, 1.0, FILTER_IGNORE, true);
+	}
 }
 
 /////////////////////////////////////////////////
