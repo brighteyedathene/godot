@@ -55,10 +55,15 @@ void BaseButton::_unpress_group() {
 
 void BaseButton::set_hovering(bool p_hovering) {
 	status.hovering = p_hovering;
+	// if we move off the button, unpress it. This is normally handled in gui input i think
+	if (!p_hovering) {
+		status.pressing_inside = false;
+		status.press_attempt = false;
+	}
 	queue_redraw();
 }
 
-void BaseButton::gui_input_native(const Ref<InputEvent> &p_event) {
+void BaseButton::gui_input_native(const Ref<InputEvent>& p_event) {
 	gui_input(p_event);
 }
 
@@ -452,7 +457,7 @@ PackedStringArray BaseButton::get_configuration_warnings() const {
 void BaseButton::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_hovering"), &BaseButton::set_hovering);
 	ClassDB::bind_method(D_METHOD("gui_input_native"), &BaseButton::gui_input_native);
-
+	
 	ClassDB::bind_method(D_METHOD("set_pressed", "pressed"), &BaseButton::set_pressed);
 	ClassDB::bind_method(D_METHOD("is_pressed"), &BaseButton::is_pressed);
 	ClassDB::bind_method(D_METHOD("set_pressed_no_signal", "pressed"), &BaseButton::set_pressed_no_signal);

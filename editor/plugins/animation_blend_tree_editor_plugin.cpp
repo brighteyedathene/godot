@@ -1105,12 +1105,14 @@ AnimationNodeBlendTreeEditor::AnimationNodeBlendTreeEditor() {
 	add_node->set_disabled(read_only);
 
 	add_options.push_back(AddOption("Animation", "AnimationNodeAnimation"));
+	add_options.push_back(AddOption("AnimationPose", "AnimationNodeAnimationPose"));
 	add_options.push_back(AddOption("OneShot", "AnimationNodeOneShot", 2));
 	add_options.push_back(AddOption("Add2", "AnimationNodeAdd2", 2));
 	add_options.push_back(AddOption("Add3", "AnimationNodeAdd3", 3));
 	add_options.push_back(AddOption("Blend2", "AnimationNodeBlend2", 2));
 	add_options.push_back(AddOption("Blend3", "AnimationNodeBlend3", 3));
 	add_options.push_back(AddOption("Sub2", "AnimationNodeSub2", 2));
+	add_options.push_back(AddOption("TimeSeekFake", "AnimationNodeTimeSeekFake", 1));
 	add_options.push_back(AddOption("TimeSeek", "AnimationNodeTimeSeek", 1));
 	add_options.push_back(AddOption("TimeScale", "AnimationNodeTimeScale", 1));
 	add_options.push_back(AddOption("Transition", "AnimationNodeTransition"));

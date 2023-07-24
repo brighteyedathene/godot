@@ -2204,9 +2204,10 @@ NodePath Control::get_focus_neighbor(Side p_side) const {
 	return data.focus_neighbor[p_side];
 }
 
-Control *Control::get_focus_neighbor_native(Side p_side) {
+Control* Control::get_focus_neighbor_native(Side p_side){
 	return _get_focus_neighbor(p_side, 0);
 }
+
 
 void Control::set_focus_next(const NodePath &p_next) {
 	ERR_MAIN_THREAD_GUARD;

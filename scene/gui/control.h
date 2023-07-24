@@ -308,6 +308,10 @@ private:
 	void _window_find_focus_neighbor(const Vector2 &p_dir, Node *p_at, const Point2 *p_points, real_t p_min, real_t &r_closest_dist, Control **r_closest);
 	Control *_get_focus_neighbor(Side p_side, int p_count = 0);
 
+	// I want to expose the neighbour finding thing that only the internal ui navigation has.
+	Control *get_focus_neighbor_native(Side p_side);
+
+
 	// Theming.
 
 	void _theme_changed();
@@ -529,9 +533,6 @@ public:
 
 	void set_focus_neighbor(Side p_side, const NodePath &p_neighbor);
 	NodePath get_focus_neighbor(Side p_side) const;
-
-	// I want to expose the neighbour finding thing that only the internal ui navigation has.
-	Control *get_focus_neighbor_native(Side p_side);
 
 	void set_focus_next(const NodePath &p_next);
 	NodePath get_focus_next() const;

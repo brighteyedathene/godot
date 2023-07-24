@@ -475,6 +475,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AnimationNodeOutput);
 	GDREGISTER_CLASS(AnimationNodeOneShot);
 	GDREGISTER_CLASS(AnimationNodeAnimation);
+	GDREGISTER_CLASS(AnimationNodeAnimationPose);
 	GDREGISTER_CLASS(AnimationNodeAdd2);
 	GDREGISTER_CLASS(AnimationNodeAdd3);
 	GDREGISTER_CLASS(AnimationNodeBlend2);
@@ -482,6 +483,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AnimationNodeSub2);
 	GDREGISTER_CLASS(AnimationNodeTimeScale);
 	GDREGISTER_CLASS(AnimationNodeTimeSeek);
+	GDREGISTER_CLASS(AnimationNodeTimeSeekFake);
 	GDREGISTER_CLASS(AnimationNodeTransition);
 
 	GDREGISTER_CLASS(ShaderGlobalsOverride); // can be used in any shader

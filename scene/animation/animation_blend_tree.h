@@ -36,6 +36,7 @@
 class AnimationNodeAnimation : public AnimationRootNode {
 	GDCLASS(AnimationNodeAnimation, AnimationRootNode);
 
+protected:
 	StringName animation;
 	StringName time = "time";
 
@@ -70,9 +71,17 @@ protected:
 	void _validate_property(PropertyInfo &p_property) const;
 	static void _bind_methods();
 
-private:
 	PlayMode play_mode = PLAY_MODE_FORWARD;
 	bool backward = false; // Only used by pingpong animation.
+};
+
+class AnimationNodeAnimationPose : public AnimationNodeAnimation {
+	GDCLASS(AnimationNodeAnimationPose, AnimationNodeAnimation);
+
+public:
+
+	virtual String get_caption() const override;
+	virtual double _process(double p_time, bool p_seek, bool p_is_external_seeking, bool p_test_only = false) override;
 };
 
 VARIANT_ENUM_CAST(AnimationNodeAnimation::PlayMode)
@@ -288,9 +297,9 @@ public:
 class AnimationNodeTimeSeek : public AnimationNode {
 	GDCLASS(AnimationNodeTimeSeek, AnimationNode);
 
+protected:
 	StringName seek_pos_request = PNAME("seek_request");
 
-protected:
 	static void _bind_methods();
 
 public:
@@ -302,6 +311,15 @@ public:
 	virtual double _process(double p_time, bool p_seek, bool p_is_external_seeking, bool p_test_only = false) override;
 
 	AnimationNodeTimeSeek();
+};
+
+class AnimationNodeTimeSeekFake : public AnimationNodeTimeSeek {
+	GDCLASS(AnimationNodeTimeSeekFake, AnimationNodeTimeSeek);
+
+public:
+	virtual String get_caption() const override;
+
+	double _process(double p_time, bool p_seek, bool p_is_external_seeking, bool p_test_only = false) override;
 };
 
 class AnimationNodeTransition : public AnimationNodeSync {
