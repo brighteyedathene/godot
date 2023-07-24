@@ -230,14 +230,16 @@ public:
 	String get_cache_dir() const;
 
 	Error set_thread_name(const String &p_name);
-	Thread::ID get_thread_caller_id() const;
-	Thread::ID get_main_thread_id() const;
+	::Thread::ID get_thread_caller_id() const;
+	::Thread::ID get_main_thread_id() const;
 
 	bool has_feature(const String &p_feature) const;
+	bool is_sandboxed() const;
 
 	bool request_permission(const String &p_name);
 	bool request_permissions();
 	Vector<String> get_granted_permissions() const;
+	void revoke_granted_permissions();
 
 	static OS *get_singleton() { return singleton; }
 
@@ -408,6 +410,8 @@ public:
 	bool is_started() const;
 	bool is_alive() const;
 	Variant wait_to_finish();
+
+	static void set_thread_safety_checks_enabled(bool p_enabled);
 };
 
 namespace special {

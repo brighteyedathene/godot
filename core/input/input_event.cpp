@@ -201,7 +201,7 @@ bool InputEventWithModifiers::is_alt_pressed() const {
 }
 
 void InputEventWithModifiers::set_ctrl_pressed(bool p_enabled) {
-	ERR_FAIL_COND_MSG(command_or_control_autoremap, "Command/Control autoremaping is enabled, cannot set Control directly!");
+	ERR_FAIL_COND_MSG(command_or_control_autoremap, "Command or Control autoremapping is enabled, cannot set Control directly!");
 	ctrl_pressed = p_enabled;
 	emit_changed();
 }
@@ -211,7 +211,7 @@ bool InputEventWithModifiers::is_ctrl_pressed() const {
 }
 
 void InputEventWithModifiers::set_meta_pressed(bool p_enabled) {
-	ERR_FAIL_COND_MSG(command_or_control_autoremap, "Command/Control autoremaping is enabled, cannot set Meta directly!");
+	ERR_FAIL_COND_MSG(command_or_control_autoremap, "Command or Control autoremapping is enabled, cannot set Meta directly!");
 	meta_pressed = p_enabled;
 	emit_changed();
 }
@@ -1109,6 +1109,15 @@ String InputEventJoypadMotion::to_string() {
 	return vformat("InputEventJoypadMotion: axis=%d, axis_value=%.2f", axis, axis_value);
 }
 
+Ref<InputEventJoypadMotion> InputEventJoypadMotion::create_reference(JoyAxis p_axis, float p_value) {
+	Ref<InputEventJoypadMotion> ie;
+	ie.instantiate();
+	ie->set_axis(p_axis);
+	ie->set_axis_value(p_value);
+
+	return ie;
+}
+
 void InputEventJoypadMotion::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_axis", "axis"), &InputEventJoypadMotion::set_axis);
 	ClassDB::bind_method(D_METHOD("get_axis"), &InputEventJoypadMotion::get_axis);
@@ -1183,7 +1192,7 @@ static const char *_joy_button_descriptions[(size_t)JoyButton::SDL_MAX] = {
 	TTRC("Top Action, Sony Triangle, Xbox Y, Nintendo X"),
 	TTRC("Back, Sony Select, Xbox Back, Nintendo -"),
 	TTRC("Guide, Sony PS, Xbox Home"),
-	TTRC("Start, Nintendo +"),
+	TTRC("Start, Xbox Menu, Nintendo +"),
 	TTRC("Left Stick, Sony L3, Xbox L/LS"),
 	TTRC("Right Stick, Sony R3, Xbox R/RS"),
 	TTRC("Left Shoulder, Sony L1, Xbox LB"),

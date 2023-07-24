@@ -30,7 +30,6 @@
 
 #include "audio_stream_editor_plugin.h"
 
-#include "core/core_string_names.h"
 #include "editor/audio_stream_preview.h"
 #include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
@@ -75,7 +74,8 @@ void AudioStreamEditor::_notification(int p_what) {
 
 void AudioStreamEditor::_draw_preview() {
 	Size2 size = get_size();
-	if ((int)size.width <= 0) {
+	int width = size.width;
+	if (width <= 0) {
 		return; // No points to draw.
 	}
 
@@ -85,9 +85,9 @@ void AudioStreamEditor::_draw_preview() {
 	float preview_len = preview->get_length();
 
 	Vector<Vector2> points;
-	points.resize((int)size.width * 2);
+	points.resize(width * 2);
 
-	for (int i = 0; i < size.width; i++) {
+	for (int i = 0; i < width; i++) {
 		float ofs = i * preview_len / size.width;
 		float ofs_n = (i + 1) * preview_len / size.width;
 		float max = preview->get_max(ofs, ofs_n) * 0.5 + 0.5;
@@ -194,7 +194,7 @@ void AudioStreamEditor::_seek_to(real_t p_x) {
 
 void AudioStreamEditor::set_stream(const Ref<AudioStream> &p_stream) {
 	if (stream.is_valid()) {
-		stream->disconnect(CoreStringNames::get_singleton()->changed, callable_mp(this, &AudioStreamEditor::_stream_changed));
+		stream->disconnect_changed(callable_mp(this, &AudioStreamEditor::_stream_changed));
 	}
 
 	stream = p_stream;
@@ -202,7 +202,7 @@ void AudioStreamEditor::set_stream(const Ref<AudioStream> &p_stream) {
 		hide();
 		return;
 	}
-	stream->connect(CoreStringNames::get_singleton()->changed, callable_mp(this, &AudioStreamEditor::_stream_changed));
+	stream->connect_changed(callable_mp(this, &AudioStreamEditor::_stream_changed));
 
 	_player->set_stream(stream);
 	_current = 0;

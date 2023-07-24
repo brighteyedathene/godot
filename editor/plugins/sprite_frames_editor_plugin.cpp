@@ -46,6 +46,7 @@
 #include "scene/gui/option_button.h"
 #include "scene/gui/panel_container.h"
 #include "scene/gui/separator.h"
+#include "scene/resources/atlas_texture.h"
 
 static void _draw_shadowed_line(Control *p_control, const Point2 &p_from, const Size2 &p_size, const Size2 &p_shadow_offset, Color p_color, Color p_shadow_color) {
 	p_control->draw_line(p_from, p_from + p_size, p_color);
@@ -948,13 +949,16 @@ void SpriteFramesEditor::_animation_name_edited() {
 	String name = new_name;
 	int counter = 0;
 	while (frames->has_animation(name)) {
+		if (name == String(edited_anim)) {
+			edited->set_text(0, name); // The name didn't change, just updated the column text to name.
+			return;
+		}
 		counter++;
 		name = new_name + "_" + itos(counter);
 	}
 
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
 	undo_redo->create_action(TTR("Rename Animation"), UndoRedo::MERGE_DISABLE, EditorNode::get_singleton()->get_edited_scene());
-	_rename_node_animation(undo_redo, false, edited_anim, "", "");
 	undo_redo->add_do_method(frames.ptr(), "rename_animation", edited_anim, name);
 	undo_redo->add_undo_method(frames.ptr(), "rename_animation", name, edited_anim);
 	_rename_node_animation(undo_redo, false, edited_anim, name, name);
@@ -1198,33 +1202,38 @@ void SpriteFramesEditor::_update_library(bool p_skip_selector) {
 		List<StringName> anim_names;
 		frames->get_animation_list(&anim_names);
 		anim_names.sort_custom<StringName::AlphCompare>();
-
+		if (!anim_names.size()) {
+			missing_anim_label->show();
+			anim_frames_vb->hide();
+			return;
+		}
+		missing_anim_label->hide();
+		anim_frames_vb->show();
 		bool searching = anim_search_box->get_text().size();
 		String searched_string = searching ? anim_search_box->get_text().to_lower() : String();
 
+		TreeItem *selected = nullptr;
 		for (const StringName &E : anim_names) {
 			String name = E;
-
 			if (searching && name.to_lower().find(searched_string) < 0) {
 				continue;
 			}
-
 			TreeItem *it = animations->create_item(anim_root);
-
 			it->set_metadata(0, name);
-
 			it->set_text(0, name);
 			it->set_editable(0, true);
-
 			if (animated_sprite) {
 				if (name == String(animated_sprite->call("get_autoplay"))) {
 					it->set_icon(0, autoplay_icon);
 				}
 			}
-
 			if (E == edited_anim) {
 				it->select(0);
+				selected = it;
 			}
+		}
+		if (selected) {
+			animations->scroll_to_item(selected);
 		}
 	}
 
@@ -1705,12 +1714,22 @@ SpriteFramesEditor::SpriteFramesEditor() {
 	delete_anim->set_shortcut_context(animations);
 	delete_anim->set_shortcut(ED_SHORTCUT("sprite_frames/delete_animation", TTR("Delete Animation"), Key::KEY_DELETE));
 
-	VBoxContainer *vbc = memnew(VBoxContainer);
-	add_child(vbc);
-	vbc->set_h_size_flags(SIZE_EXPAND_FILL);
+	missing_anim_label = memnew(Label);
+	missing_anim_label->set_text(TTR("This resource does not have any animations."));
+	missing_anim_label->set_h_size_flags(SIZE_EXPAND_FILL);
+	missing_anim_label->set_v_size_flags(SIZE_EXPAND_FILL);
+	missing_anim_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
+	missing_anim_label->set_vertical_alignment(VERTICAL_ALIGNMENT_CENTER);
+	missing_anim_label->hide();
+	add_child(missing_anim_label);
+
+	anim_frames_vb = memnew(VBoxContainer);
+	add_child(anim_frames_vb);
+	anim_frames_vb->set_h_size_flags(SIZE_EXPAND_FILL);
+	anim_frames_vb->hide();
 
 	sub_vb = memnew(VBoxContainer);
-	vbc->add_margin_child(TTR("Animation Frames:"), sub_vb, true);
+	anim_frames_vb->add_margin_child(TTR("Animation Frames:"), sub_vb, true);
 
 	HFlowContainer *hfc = memnew(HFlowContainer);
 	sub_vb->add_child(hfc);
@@ -1850,6 +1869,7 @@ SpriteFramesEditor::SpriteFramesEditor() {
 	frame_list = memnew(ItemList);
 	frame_list->set_v_size_flags(SIZE_EXPAND_FILL);
 	frame_list->set_icon_mode(ItemList::ICON_MODE_TOP);
+	frame_list->set_texture_filter(TEXTURE_FILTER_NEAREST_WITH_MIPMAPS);
 
 	frame_list->set_max_columns(0);
 	frame_list->set_icon_mode(ItemList::ICON_MODE_TOP);
@@ -1974,6 +1994,7 @@ SpriteFramesEditor::SpriteFramesEditor() {
 
 	split_sheet_preview = memnew(TextureRect);
 	split_sheet_preview->set_expand_mode(TextureRect::EXPAND_IGNORE_SIZE);
+	split_sheet_preview->set_texture_filter(TEXTURE_FILTER_NEAREST_WITH_MIPMAPS);
 	split_sheet_preview->set_mouse_filter(MOUSE_FILTER_PASS);
 	split_sheet_preview->connect("draw", callable_mp(this, &SpriteFramesEditor::_sheet_preview_draw));
 	split_sheet_preview->connect("gui_input", callable_mp(this, &SpriteFramesEditor::_sheet_preview_input));

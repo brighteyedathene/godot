@@ -219,6 +219,7 @@ void TextServer::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("font_set_name", "font_rid", "name"), &TextServer::font_set_name);
 	ClassDB::bind_method(D_METHOD("font_get_name", "font_rid"), &TextServer::font_get_name);
+	ClassDB::bind_method(D_METHOD("font_get_ot_name_strings", "font_rid"), &TextServer::font_get_ot_name_strings);
 
 	ClassDB::bind_method(D_METHOD("font_set_style_name", "font_rid", "name"), &TextServer::font_set_style_name);
 	ClassDB::bind_method(D_METHOD("font_get_style_name", "font_rid"), &TextServer::font_get_style_name);
@@ -713,6 +714,7 @@ PackedInt32Array TextServer::shaped_text_get_line_breaks_adv(const RID &p_shaped
 
 	real_t width = 0.f;
 	int line_start = MAX(p_start, range.x);
+	int last_end = line_start;
 	int prev_safe_break = 0;
 	int last_safe_break = -1;
 	int word_count = 0;
@@ -738,12 +740,18 @@ PackedInt32Array TextServer::shaped_text_get_line_breaks_adv(const RID &p_shaped
 					while ((start_pos < end_pos) && ((l_gl[end_pos].flags & GRAPHEME_IS_SPACE) == GRAPHEME_IS_SPACE || (l_gl[end_pos].flags & GRAPHEME_IS_BREAK_HARD) == GRAPHEME_IS_BREAK_HARD || (l_gl[end_pos].flags & GRAPHEME_IS_BREAK_SOFT) == GRAPHEME_IS_BREAK_SOFT)) {
 						end_pos -= l_gl[end_pos].count;
 					}
-					lines.push_back(l_gl[start_pos].start);
-					lines.push_back(l_gl[end_pos].end);
+					if (last_end <= l_gl[start_pos].start) {
+						lines.push_back(l_gl[start_pos].start);
+						lines.push_back(l_gl[end_pos].end);
+						last_end = l_gl[end_pos].end;
+					}
 					trim_next = true;
 				} else {
-					lines.push_back(line_start);
-					lines.push_back(l_gl[last_safe_break].end);
+					if (last_end <= line_start) {
+						lines.push_back(line_start);
+						lines.push_back(l_gl[last_safe_break].end);
+						last_end = l_gl[last_safe_break].end;
+					}
 				}
 				line_start = l_gl[last_safe_break].end;
 				prev_safe_break = last_safe_break + 1;
@@ -771,12 +779,18 @@ PackedInt32Array TextServer::shaped_text_get_line_breaks_adv(const RID &p_shaped
 						while ((start_pos < end_pos) && ((l_gl[end_pos].flags & GRAPHEME_IS_SPACE) == GRAPHEME_IS_SPACE || (l_gl[end_pos].flags & GRAPHEME_IS_BREAK_HARD) == GRAPHEME_IS_BREAK_HARD || (l_gl[end_pos].flags & GRAPHEME_IS_BREAK_SOFT) == GRAPHEME_IS_BREAK_SOFT)) {
 							end_pos -= l_gl[end_pos].count;
 						}
-						lines.push_back(l_gl[start_pos].start);
-						lines.push_back(l_gl[end_pos].end);
+						if (last_end <= l_gl[start_pos].start) {
+							lines.push_back(l_gl[start_pos].start);
+							lines.push_back(l_gl[end_pos].end);
+							last_end = l_gl[end_pos].end;
+						}
 						trim_next = false;
 					} else {
-						lines.push_back(line_start);
-						lines.push_back(l_gl[i].end);
+						if (last_end <= line_start) {
+							lines.push_back(line_start);
+							lines.push_back(l_gl[i].end);
+							last_end = l_gl[i].end;
+						}
 					}
 					line_start = l_gl[i].end;
 					prev_safe_break = i + 1;
@@ -832,6 +846,7 @@ PackedInt32Array TextServer::shaped_text_get_line_breaks(const RID &p_shaped, do
 
 	double width = 0.f;
 	int line_start = MAX(p_start, range.x);
+	int last_end = line_start;
 	int prev_safe_break = 0;
 	int last_safe_break = -1;
 	int word_count = 0;
@@ -856,12 +871,18 @@ PackedInt32Array TextServer::shaped_text_get_line_breaks(const RID &p_shaped, do
 					while ((start_pos < end_pos) && ((l_gl[end_pos].flags & GRAPHEME_IS_SPACE) == GRAPHEME_IS_SPACE || (l_gl[end_pos].flags & GRAPHEME_IS_BREAK_HARD) == GRAPHEME_IS_BREAK_HARD || (l_gl[end_pos].flags & GRAPHEME_IS_BREAK_SOFT) == GRAPHEME_IS_BREAK_SOFT)) {
 						end_pos -= l_gl[end_pos].count;
 					}
-					lines.push_back(l_gl[start_pos].start);
-					lines.push_back(l_gl[end_pos].end);
+					if (last_end <= l_gl[start_pos].start) {
+						lines.push_back(l_gl[start_pos].start);
+						lines.push_back(l_gl[end_pos].end);
+						last_end = l_gl[end_pos].end;
+					}
 					trim_next = true;
 				} else {
-					lines.push_back(line_start);
-					lines.push_back(l_gl[last_safe_break].end);
+					if (last_end <= line_start) {
+						lines.push_back(line_start);
+						lines.push_back(l_gl[last_safe_break].end);
+						last_end = l_gl[last_safe_break].end;
+					}
 				}
 				line_start = l_gl[last_safe_break].end;
 				prev_safe_break = last_safe_break + 1;
@@ -883,11 +904,17 @@ PackedInt32Array TextServer::shaped_text_get_line_breaks(const RID &p_shaped, do
 							end_pos -= l_gl[end_pos].count;
 						}
 						trim_next = false;
-						lines.push_back(l_gl[start_pos].start);
-						lines.push_back(l_gl[end_pos].end);
+						if (last_end <= l_gl[start_pos].start) {
+							lines.push_back(l_gl[start_pos].start);
+							lines.push_back(l_gl[end_pos].end);
+							last_end = l_gl[end_pos].end;
+						}
 					} else {
-						lines.push_back(line_start);
-						lines.push_back(l_gl[i].end);
+						if (last_end <= line_start) {
+							lines.push_back(line_start);
+							lines.push_back(l_gl[i].end);
+							last_end = l_gl[i].end;
+						}
 					}
 					line_start = l_gl[i].end;
 					prev_safe_break = i + 1;
@@ -1512,7 +1539,7 @@ void TextServer::shaped_text_draw_outline(const RID &p_shaped, const RID &p_canv
 	if (rtl && ellipsis_pos >= 0) {
 		for (int i = ellipsis_gl_size - 1; i >= 0; i--) {
 			for (int j = 0; j < ellipsis_glyphs[i].repeat; j++) {
-				font_draw_glyph(ellipsis_glyphs[i].font_rid, p_canvas, ellipsis_glyphs[i].font_size, ofs + Vector2(ellipsis_glyphs[i].x_off, ellipsis_glyphs[i].y_off), ellipsis_glyphs[i].index, p_color);
+				font_draw_glyph_outline(ellipsis_glyphs[i].font_rid, p_canvas, ellipsis_glyphs[i].font_size, p_outline_size, ofs + Vector2(ellipsis_glyphs[i].x_off, ellipsis_glyphs[i].y_off), ellipsis_glyphs[i].index, p_color);
 				if (orientation == ORIENTATION_HORIZONTAL) {
 					ofs.x += ellipsis_glyphs[i].advance;
 				} else {
@@ -1575,7 +1602,7 @@ void TextServer::shaped_text_draw_outline(const RID &p_shaped, const RID &p_canv
 	if (!rtl && ellipsis_pos >= 0) {
 		for (int i = 0; i < ellipsis_gl_size; i++) {
 			for (int j = 0; j < ellipsis_glyphs[i].repeat; j++) {
-				font_draw_glyph(ellipsis_glyphs[i].font_rid, p_canvas, ellipsis_glyphs[i].font_size, ofs + Vector2(ellipsis_glyphs[i].x_off, ellipsis_glyphs[i].y_off), ellipsis_glyphs[i].index, p_color);
+				font_draw_glyph_outline(ellipsis_glyphs[i].font_rid, p_canvas, ellipsis_glyphs[i].font_size, p_outline_size, ofs + Vector2(ellipsis_glyphs[i].x_off, ellipsis_glyphs[i].y_off), ellipsis_glyphs[i].index, p_color);
 				if (orientation == ORIENTATION_HORIZONTAL) {
 					ofs.x += ellipsis_glyphs[i].advance;
 				} else {

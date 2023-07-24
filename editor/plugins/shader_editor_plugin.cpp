@@ -265,19 +265,47 @@ void ShaderEditorPlugin::get_window_layout(Ref<ConfigFile> p_layout) {
 	for (int i = 0; i < shader_tabs->get_tab_count(); i++) {
 		EditedShader edited_shader = edited_shaders[i];
 		if (edited_shader.shader_editor || edited_shader.visual_shader_editor) {
-			shaders.push_back(edited_shader.shader->get_path());
+			String shader_path;
+			if (edited_shader.shader.is_valid()) {
+				shader_path = edited_shader.shader->get_path();
+			} else {
+				DEV_ASSERT(edited_shader.shader_inc.is_valid());
+				shader_path = edited_shader.shader_inc->get_path();
+			}
+			shaders.push_back(shader_path);
 
 			TextShaderEditor *shader_editor = Object::cast_to<TextShaderEditor>(shader_tabs->get_current_tab_control());
 			VisualShaderEditor *visual_shader_editor = Object::cast_to<VisualShaderEditor>(shader_tabs->get_current_tab_control());
 
 			if ((shader_editor && edited_shader.shader_editor == shader_editor) || (visual_shader_editor && edited_shader.visual_shader_editor == visual_shader_editor)) {
-				selected_shader = edited_shader.shader->get_path();
+				selected_shader = shader_path;
 			}
 		}
 	}
 	p_layout->set_value("ShaderEditor", "open_shaders", shaders);
 	p_layout->set_value("ShaderEditor", "split_offset", main_split->get_split_offset());
 	p_layout->set_value("ShaderEditor", "selected_shader", selected_shader);
+}
+
+String ShaderEditorPlugin::get_unsaved_status(const String &p_for_scene) const {
+	if (!p_for_scene.is_empty()) {
+		// TODO: handle built-in shaders.
+		return String();
+	}
+
+	// TODO: This should also include visual shaders and shader includes, but save_external_data() doesn't seem to save them...
+	PackedStringArray unsaved_shaders;
+	for (uint32_t i = 0; i < edited_shaders.size(); i++) {
+		if (edited_shaders[i].shader_editor) {
+			if (edited_shaders[i].shader_editor->is_unsaved()) {
+				if (unsaved_shaders.is_empty()) {
+					unsaved_shaders.append(TTR("Save changes to the following shaders(s) before quitting?"));
+				}
+				unsaved_shaders.append(edited_shaders[i].shader_editor->get_name());
+			}
+		}
+	}
+	return String("\n").join(unsaved_shaders);
 }
 
 void ShaderEditorPlugin::save_external_data() {
@@ -552,7 +580,7 @@ void ShaderEditorPlugin::_notification(int p_what) {
 
 ShaderEditorPlugin::ShaderEditorPlugin() {
 	window_wrapper = memnew(WindowWrapper);
-	window_wrapper->set_window_title(TTR("Shader Editor - Godot Engine"));
+	window_wrapper->set_window_title(vformat(TTR("%s - Godot Engine"), TTR("Shader Editor")));
 	window_wrapper->set_margins_enabled(true);
 
 	main_split = memnew(HSplitContainer);

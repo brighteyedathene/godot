@@ -31,6 +31,7 @@
 #include "worker_thread_pool.h"
 
 #include "core/os/os.h"
+#include "core/os/thread_safe.h"
 
 void WorkerThreadPool::Task::free_template_userdata() {
 	ERR_FAIL_COND(!template_userdata);
@@ -55,6 +56,8 @@ void WorkerThreadPool::_process_task(Task *p_task) {
 	Task *prev_low_prio_task = nullptr; // In case this is recursively called.
 
 	if (!use_native_low_priority_threads) {
+		// Tasks must start with this unset. They are free to set-and-forget otherwise.
+		set_current_thread_safe_for_nodes(false);
 		pool_thread_index = thread_ids[Thread::get_caller_id()];
 		ThreadData &curr_thread = threads[pool_thread_index];
 		task_mutex.lock();
@@ -367,7 +370,9 @@ Error WorkerThreadPool::wait_for_task_completion(TaskID p_task_id) {
 								must_exit = true;
 							} else {
 								// Solve tasks while they are around.
+								bool safe_for_nodes_backup = is_current_thread_safe_for_nodes();
 								_process_task_queue();
+								set_current_thread_safe_for_nodes(safe_for_nodes_backup);
 								continue;
 							}
 						} else if (!use_native_low_priority_threads && task->low_priority) {
@@ -411,7 +416,7 @@ Error WorkerThreadPool::wait_for_task_completion(TaskID p_task_id) {
 WorkerThreadPool::GroupID WorkerThreadPool::_add_group_task(const Callable &p_callable, void (*p_func)(void *, uint32_t), void *p_userdata, BaseTemplateUserdata *p_template_userdata, int p_elements, int p_tasks, bool p_high_priority, const String &p_description) {
 	ERR_FAIL_COND_V(p_elements < 0, INVALID_TASK_ID);
 	if (p_tasks < 0) {
-		p_tasks = threads.size();
+		p_tasks = MAX(1u, threads.size());
 	}
 
 	task_mutex.lock();

@@ -66,7 +66,7 @@ void AnimationNodeAnimation::_validate_property(PropertyInfo &p_property) const 
 
 double AnimationNodeAnimation::_process(double p_time, bool p_seek, bool p_is_external_seeking, bool p_test_only) {
 	AnimationPlayer *ap = state->player;
-	ERR_FAIL_COND_V(!ap, 0);
+	ERR_FAIL_NULL_V(ap, 0);
 
 	double cur_time = get_parameter(time);
 
@@ -527,7 +527,7 @@ AnimationNodeOneShot::AnimationNodeOneShot() {
 ////////////////////////////////////////////////
 
 void AnimationNodeAdd2::get_parameter_list(List<PropertyInfo> *r_list) const {
-	r_list->push_back(PropertyInfo(Variant::FLOAT, add_amount, PROPERTY_HINT_RANGE, "0,1,0.01"));
+	r_list->push_back(PropertyInfo(Variant::FLOAT, add_amount, PROPERTY_HINT_RANGE, "0,1,0.01,or_less,or_greater"));
 }
 
 Variant AnimationNodeAdd2::get_parameter_default_value(const StringName &p_parameter) const {
@@ -561,7 +561,7 @@ AnimationNodeAdd2::AnimationNodeAdd2() {
 ////////////////////////////////////////////////
 
 void AnimationNodeAdd3::get_parameter_list(List<PropertyInfo> *r_list) const {
-	r_list->push_back(PropertyInfo(Variant::FLOAT, add_amount, PROPERTY_HINT_RANGE, "-1,1,0.01"));
+	r_list->push_back(PropertyInfo(Variant::FLOAT, add_amount, PROPERTY_HINT_RANGE, "-1,1,0.01,or_less,or_greater"));
 }
 
 Variant AnimationNodeAdd3::get_parameter_default_value(const StringName &p_parameter) const {
@@ -597,7 +597,7 @@ AnimationNodeAdd3::AnimationNodeAdd3() {
 /////////////////////////////////////////////
 
 void AnimationNodeBlend2::get_parameter_list(List<PropertyInfo> *r_list) const {
-	r_list->push_back(PropertyInfo(Variant::FLOAT, blend_amount, PROPERTY_HINT_RANGE, "0,1,0.01"));
+	r_list->push_back(PropertyInfo(Variant::FLOAT, blend_amount, PROPERTY_HINT_RANGE, "0,1,0.01,or_less,or_greater"));
 }
 
 Variant AnimationNodeBlend2::get_parameter_default_value(const StringName &p_parameter) const {
@@ -632,7 +632,7 @@ AnimationNodeBlend2::AnimationNodeBlend2() {
 //////////////////////////////////////
 
 void AnimationNodeBlend3::get_parameter_list(List<PropertyInfo> *r_list) const {
-	r_list->push_back(PropertyInfo(Variant::FLOAT, blend_amount, PROPERTY_HINT_RANGE, "-1,1,0.01"));
+	r_list->push_back(PropertyInfo(Variant::FLOAT, blend_amount, PROPERTY_HINT_RANGE, "-1,1,0.01,or_less,or_greater"));
 }
 
 Variant AnimationNodeBlend3::get_parameter_default_value(const StringName &p_parameter) const {
@@ -659,6 +659,39 @@ AnimationNodeBlend3::AnimationNodeBlend3() {
 	add_input("-blend");
 	add_input("in");
 	add_input("+blend");
+}
+
+////////////////////////////////////////////////
+
+void AnimationNodeSub2::get_parameter_list(List<PropertyInfo> *r_list) const {
+	r_list->push_back(PropertyInfo(Variant::FLOAT, sub_amount, PROPERTY_HINT_RANGE, "0,1,0.01,or_less,or_greater"));
+}
+
+Variant AnimationNodeSub2::get_parameter_default_value(const StringName &p_parameter) const {
+	return 0;
+}
+
+String AnimationNodeSub2::get_caption() const {
+	return "Sub2";
+}
+
+bool AnimationNodeSub2::has_filter() const {
+	return true;
+}
+
+double AnimationNodeSub2::_process(double p_time, bool p_seek, bool p_is_external_seeking, bool p_test_only) {
+	double amount = get_parameter(sub_amount);
+	// Out = Sub.Transform3D^(-1) * In.Transform3D
+	blend_input(1, p_time, p_seek, p_is_external_seeking, -amount, FILTER_PASS, sync, p_test_only);
+	return blend_input(0, p_time, p_seek, p_is_external_seeking, 1.0, FILTER_IGNORE, sync, p_test_only);
+}
+
+void AnimationNodeSub2::_bind_methods() {
+}
+
+AnimationNodeSub2::AnimationNodeSub2() {
+	add_input("in");
+	add_input("sub");
 }
 
 /////////////////////////////////
@@ -977,6 +1010,7 @@ double AnimationNodeTransition::_process(double p_time, bool p_seek, bool p_is_e
 	}
 
 	double rem = 0.0;
+	double abs_time = Math::abs(p_time);
 
 	if (sync) {
 		for (int i = 0; i < get_input_count(); i++) {
@@ -991,9 +1025,9 @@ double AnimationNodeTransition::_process(double p_time, bool p_seek, bool p_is_e
 		rem = blend_input(cur_current_index, p_time, p_seek, p_is_external_seeking, 1.0, FILTER_IGNORE, true, p_test_only);
 
 		if (p_seek) {
-			cur_time = p_time;
+			cur_time = abs_time;
 		} else {
-			cur_time += p_time;
+			cur_time += abs_time;
 		}
 
 		if (input_data[cur_current_index].auto_advance && rem <= xfade_time) {
@@ -1025,10 +1059,10 @@ double AnimationNodeTransition::_process(double p_time, bool p_seek, bool p_is_e
 
 		blend_input(cur_prev_index, p_time, use_blend && p_seek, p_is_external_seeking, blend, FILTER_IGNORE, true, p_test_only);
 		if (p_seek) {
-			cur_time = p_time;
+			cur_time = abs_time;
 		} else {
-			cur_time += p_time;
-			cur_prev_xfading -= p_time;
+			cur_time += abs_time;
+			cur_prev_xfading -= abs_time;
 			if (cur_prev_xfading < 0) {
 				set_parameter(prev_index, -1);
 			}
@@ -1109,7 +1143,7 @@ void AnimationNodeBlendTree::add_node(const StringName &p_name, Ref<AnimationNod
 	p_node->connect("tree_changed", callable_mp(this, &AnimationNodeBlendTree::_tree_changed), CONNECT_REFERENCE_COUNTED);
 	p_node->connect("animation_node_renamed", callable_mp(this, &AnimationNodeBlendTree::_animation_node_renamed), CONNECT_REFERENCE_COUNTED);
 	p_node->connect("animation_node_removed", callable_mp(this, &AnimationNodeBlendTree::_animation_node_removed), CONNECT_REFERENCE_COUNTED);
-	p_node->connect("changed", callable_mp(this, &AnimationNodeBlendTree::_node_changed).bind(p_name), CONNECT_REFERENCE_COUNTED);
+	p_node->connect_changed(callable_mp(this, &AnimationNodeBlendTree::_node_changed).bind(p_name), CONNECT_REFERENCE_COUNTED);
 }
 
 Ref<AnimationNode> AnimationNodeBlendTree::get_node(const StringName &p_name) const {
@@ -1145,8 +1179,6 @@ void AnimationNodeBlendTree::get_child_nodes(List<ChildNode> *r_child_nodes) {
 		ns.push_back(E.key);
 	}
 
-	ns.sort_custom<StringName::AlphCompare>();
-
 	for (int i = 0; i < ns.size(); i++) {
 		ChildNode cn;
 		cn.name = ns[i];
@@ -1173,7 +1205,7 @@ void AnimationNodeBlendTree::remove_node(const StringName &p_name) {
 		node->disconnect("tree_changed", callable_mp(this, &AnimationNodeBlendTree::_tree_changed));
 		node->disconnect("animation_node_renamed", callable_mp(this, &AnimationNodeBlendTree::_animation_node_renamed));
 		node->disconnect("animation_node_removed", callable_mp(this, &AnimationNodeBlendTree::_animation_node_removed));
-		node->disconnect("changed", callable_mp(this, &AnimationNodeBlendTree::_node_changed));
+		node->disconnect_changed(callable_mp(this, &AnimationNodeBlendTree::_node_changed));
 	}
 
 	nodes.erase(p_name);
@@ -1198,7 +1230,7 @@ void AnimationNodeBlendTree::rename_node(const StringName &p_name, const StringN
 	ERR_FAIL_COND(p_name == SceneStringNames::get_singleton()->output);
 	ERR_FAIL_COND(p_new_name == SceneStringNames::get_singleton()->output);
 
-	nodes[p_name].node->disconnect("changed", callable_mp(this, &AnimationNodeBlendTree::_node_changed));
+	nodes[p_name].node->disconnect_changed(callable_mp(this, &AnimationNodeBlendTree::_node_changed));
 
 	nodes[p_new_name] = nodes[p_name];
 	nodes.erase(p_name);
@@ -1212,7 +1244,7 @@ void AnimationNodeBlendTree::rename_node(const StringName &p_name, const StringN
 		}
 	}
 	// Connection must be done with new name.
-	nodes[p_new_name].node->connect("changed", callable_mp(this, &AnimationNodeBlendTree::_node_changed).bind(p_new_name), CONNECT_REFERENCE_COUNTED);
+	nodes[p_new_name].node->connect_changed(callable_mp(this, &AnimationNodeBlendTree::_node_changed).bind(p_new_name), CONNECT_REFERENCE_COUNTED);
 
 	emit_signal(SNAME("animation_node_renamed"), get_instance_id(), p_name, p_new_name);
 	emit_signal(SNAME("tree_changed"));
@@ -1402,7 +1434,6 @@ void AnimationNodeBlendTree::_get_property_list(List<PropertyInfo> *p_list) cons
 	for (const KeyValue<StringName, Node> &E : nodes) {
 		names.push_back(E.key);
 	}
-	names.sort_custom<StringName::AlphCompare>();
 
 	for (const StringName &E : names) {
 		String prop_name = E;
