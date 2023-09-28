@@ -499,6 +499,7 @@ class KinematicCollision3D : public RefCounted {
 	PhysicsBody3D *owner = nullptr;
 	friend class PhysicsBody3D;
 	friend class CharacterBody3D;
+	friend class NCharacter3D;
 	PhysicsServer3D::MotionResult result;
 
 protected:
