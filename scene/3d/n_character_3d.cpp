@@ -803,16 +803,19 @@ void NCharacter3D::_set_collision_direction(const PhysicsServer3D::MotionResult 
 
 		if (motion_mode == MOTION_MODE_GROUNDED) {
 			// Check if any collision is floor.
-			real_t floor_angle = collision.get_angle(up_direction);
-			if (floor_angle <= floor_max_angle + FLOOR_ANGLE_THRESHOLD) {
-				r_state.floor = true;
-				if (p_apply_state.floor && collision.depth > floor_depth) {
-					collision_state.floor = true;
-					floor_normal = collision.normal;
-					floor_depth = collision.depth;
-					_set_platform_data(collision);
+			// It can't be a character
+			if (Object::cast_to<NCharacter3D>(ObjectDB::get_instance(collision.collider_id)) == nullptr) {
+				real_t floor_angle = collision.get_angle(up_direction);
+				if (floor_angle <= floor_max_angle + FLOOR_ANGLE_THRESHOLD) {
+					r_state.floor = true;
+					if (p_apply_state.floor && collision.depth > floor_depth) {
+						collision_state.floor = true;
+						floor_normal = collision.normal;
+						floor_depth = collision.depth;
+						_set_platform_data(collision);
+					}
+					continue;
 				}
-				continue;
 			}
 
 			// Check if any collision is ceiling.
