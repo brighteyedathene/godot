@@ -404,6 +404,9 @@ Vector<AudioFrame> AudioStreamPlayer3D::_update_panning() {
 
 	PhysicsDirectSpaceState3D *space_state = PhysicsServer3D::get_singleton()->space_get_direct_state(world_3d->get_space());
 
+	// tracking shortest dist so I can apply audio effects from the nearest camera only
+	float shortest_dist = INFINITY;
+
 	for (Camera3D *camera : cameras) {
 		if (!camera) {
 			continue;
@@ -428,6 +431,9 @@ Vector<AudioFrame> AudioStreamPlayer3D::_update_panning() {
 		Vector3 local_pos = listener_node->get_global_transform().orthonormalized().affine_inverse().xform(global_pos);
 
 		float dist = local_pos.length();
+		if (dist < shortest_dist) {
+			shortest_dist = dist;
+		}
 
 		Vector3 area_sound_pos;
 		Vector3 listener_area_pos;
@@ -466,9 +472,12 @@ Vector<AudioFrame> AudioStreamPlayer3D::_update_panning() {
 			}
 		}
 
-		linear_attenuation = Math::db_to_linear(db_att);
-		for (Ref<AudioStreamPlayback> &playback : stream_playbacks) {
-			AudioServer::get_singleton()->set_playback_highshelf_params(playback, linear_attenuation, attenuation_filter_cutoff_hz);
+		// only apply the attenuation filter for the nearest camera
+		if (dist <= shortest_dist) {
+			linear_attenuation = Math::db_to_linear(db_att);
+			for (Ref<AudioStreamPlayback> &playback : stream_playbacks) {
+				AudioServer::get_singleton()->set_playback_highshelf_params(playback, linear_attenuation, attenuation_filter_cutoff_hz);
+			}
 		}
 		// Bake in a constant factor here to allow the project setting defaults for 2d and 3d to be normalized to 1.0.
 		float tightness = cached_global_panning_strength * 2.0f;
