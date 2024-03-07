@@ -71,7 +71,7 @@ class Ref {
 	}
 
 	void ref_pointer(T *p_ref) {
-		ERR_FAIL_COND(!p_ref);
+		ERR_FAIL_NULL(p_ref);
 
 		if (p_ref->init_ref()) {
 			reference = p_ref;
@@ -212,8 +212,9 @@ public:
 		reference = nullptr;
 	}
 
-	void instantiate() {
-		ref(memnew(T));
+	template <typename... VarArgs>
+	void instantiate(VarArgs... p_params) {
+		ref(memnew(T(p_params...)));
 	}
 
 	Ref() {}

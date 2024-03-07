@@ -3,6 +3,7 @@
 All such functions are invoked in a subprocess on Windows to prevent build flakiness.
 
 """
+
 import os.path
 from typing import Optional, Iterable
 
@@ -114,7 +115,7 @@ def include_file_in_rd_header(filename: str, header_data: RDHeaderStruct, depth:
 
 
 def build_rd_header(
-    filename: str, optional_output_filename: str = None, header_data: Optional[RDHeaderStruct] = None
+    filename: str, optional_output_filename: Optional[str] = None, header_data: Optional[RDHeaderStruct] = None
 ) -> None:
     header_data = header_data or RDHeaderStruct()
     include_file_in_rd_header(filename, header_data, 0)
@@ -198,7 +199,7 @@ def include_file_in_raw_header(filename: str, header_data: RAWHeaderStruct, dept
 
 
 def build_raw_header(
-    filename: str, optional_output_filename: str = None, header_data: Optional[RAWHeaderStruct] = None
+    filename: str, optional_output_filename: Optional[str] = None, header_data: Optional[RAWHeaderStruct] = None
 ):
     header_data = header_data or RAWHeaderStruct()
     include_file_in_raw_header(filename, header_data, 0)

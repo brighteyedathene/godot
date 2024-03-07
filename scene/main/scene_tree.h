@@ -178,6 +178,8 @@ private:
 	TypedArray<Node> _get_nodes_in_group(const StringName &p_group);
 
 	Node *current_scene = nullptr;
+	Node *prev_scene = nullptr;
+	Node *pending_new_scene = nullptr;
 
 	Color debug_collisions_color;
 	Color debug_collision_contact_color;
@@ -188,7 +190,7 @@ private:
 	Ref<Material> collision_material;
 	int collision_debug_contacts;
 
-	void _change_scene(Node *p_to);
+	void _flush_scene_change();
 
 	List<Ref<SceneTreeTimer>> timers;
 	List<Ref<Tween>> tweens;
@@ -383,6 +385,7 @@ public:
 	void get_nodes_in_group(const StringName &p_group, List<Node *> *p_list);
 	Node *get_first_node_in_group(const StringName &p_group);
 	bool has_group(const StringName &p_identifier) const;
+	int get_node_count_in_group(const StringName &p_group) const;
 
 	//void change_scene(const String& p_path);
 	//Node *get_loaded_scene();
@@ -406,7 +409,9 @@ public:
 
 	static SceneTree *get_singleton() { return singleton; }
 
+#ifdef TOOLS_ENABLED
 	void get_argument_options(const StringName &p_function, int p_idx, List<String> *r_options) const override;
+#endif
 
 	//network API
 

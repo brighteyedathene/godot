@@ -51,7 +51,7 @@ template <class T>
 struct VariantCaster {
 	static _FORCE_INLINE_ T cast(const Variant &p_variant) {
 		using TStripped = std::remove_pointer_t<T>;
-		if constexpr (std::is_base_of<Object, TStripped>::value) {
+		if constexpr (std::is_base_of_v<Object, TStripped>) {
 			return Object::cast_to<TStripped>(p_variant);
 		} else {
 			return p_variant;
@@ -63,7 +63,7 @@ template <class T>
 struct VariantCaster<T &> {
 	static _FORCE_INLINE_ T cast(const Variant &p_variant) {
 		using TStripped = std::remove_pointer_t<T>;
-		if constexpr (std::is_base_of<Object, TStripped>::value) {
+		if constexpr (std::is_base_of_v<Object, TStripped>) {
 			return Object::cast_to<TStripped>(p_variant);
 		} else {
 			return p_variant;
@@ -75,7 +75,7 @@ template <class T>
 struct VariantCaster<const T &> {
 	static _FORCE_INLINE_ T cast(const Variant &p_variant) {
 		using TStripped = std::remove_pointer_t<T>;
-		if constexpr (std::is_base_of<Object, TStripped>::value) {
+		if constexpr (std::is_base_of_v<Object, TStripped>) {
 			return Object::cast_to<TStripped>(p_variant);
 		} else {
 			return p_variant;
@@ -176,6 +176,7 @@ VARIANT_ENUM_CAST(Variant::Operator);
 
 VARIANT_ENUM_CAST(Key);
 VARIANT_BITFIELD_CAST(KeyModifierMask);
+VARIANT_ENUM_CAST(KeyLocation);
 
 static inline Key &operator|=(Key &a, BitField<KeyModifierMask> b) {
 	a = static_cast<Key>(static_cast<int>(a) | static_cast<int>(b.operator int64_t()));
@@ -225,7 +226,7 @@ template <typename T>
 struct VariantObjectClassChecker {
 	static _FORCE_INLINE_ bool check(const Variant &p_variant) {
 		using TStripped = std::remove_pointer_t<T>;
-		if constexpr (std::is_base_of<Object, TStripped>::value) {
+		if constexpr (std::is_base_of_v<Object, TStripped>) {
 			Object *obj = p_variant;
 			return Object::cast_to<TStripped>(p_variant) || !obj;
 		} else {
@@ -404,13 +405,13 @@ void call_with_variant_args(T *p_instance, void (T::*p_method)(P...), const Vari
 #ifdef DEBUG_METHODS_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 
 	if ((size_t)p_argcount < sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -422,7 +423,7 @@ void call_with_variant_args_dv(T *p_instance, void (T::*p_method)(P...), const V
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -433,7 +434,7 @@ void call_with_variant_args_dv(T *p_instance, void (T::*p_method)(P...), const V
 #ifdef DEBUG_ENABLED
 	if (missing > dvs) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -455,13 +456,13 @@ void call_with_variant_argsc(T *p_instance, void (T::*p_method)(P...) const, con
 #ifdef DEBUG_METHODS_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 
 	if ((size_t)p_argcount < sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -473,7 +474,7 @@ void call_with_variant_argsc_dv(T *p_instance, void (T::*p_method)(P...) const, 
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -484,7 +485,7 @@ void call_with_variant_argsc_dv(T *p_instance, void (T::*p_method)(P...) const, 
 #ifdef DEBUG_ENABLED
 	if (missing > dvs) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -506,7 +507,7 @@ void call_with_variant_args_ret_dv(T *p_instance, R (T::*p_method)(P...), const 
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -517,7 +518,7 @@ void call_with_variant_args_ret_dv(T *p_instance, R (T::*p_method)(P...), const 
 #ifdef DEBUG_ENABLED
 	if (missing > dvs) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -539,7 +540,7 @@ void call_with_variant_args_retc_dv(T *p_instance, R (T::*p_method)(P...) const,
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -550,7 +551,7 @@ void call_with_variant_args_retc_dv(T *p_instance, R (T::*p_method)(P...) const,
 #ifdef DEBUG_ENABLED
 	if (missing > dvs) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -785,13 +786,13 @@ void call_with_variant_args_ret(T *p_instance, R (T::*p_method)(P...), const Var
 #ifdef DEBUG_METHODS_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 
 	if ((size_t)p_argcount < sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -815,13 +816,13 @@ void call_with_variant_args_static_ret(R (*p_method)(P...), const Variant **p_ar
 #ifdef DEBUG_METHODS_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 
 	if ((size_t)p_argcount < sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -833,13 +834,13 @@ void call_with_variant_args_static_ret(void (*p_method)(P...), const Variant **p
 #ifdef DEBUG_METHODS_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 
 	if ((size_t)p_argcount < sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -851,13 +852,13 @@ void call_with_variant_args_retc(T *p_instance, R (T::*p_method)(P...) const, co
 #ifdef DEBUG_METHODS_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 
 	if ((size_t)p_argcount < sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -882,7 +883,7 @@ void call_with_variant_args_retc_static_helper_dv(T *p_instance, R (*p_method)(T
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -893,7 +894,7 @@ void call_with_variant_args_retc_static_helper_dv(T *p_instance, R (*p_method)(T
 #ifdef DEBUG_ENABLED
 	if (missing > dvs) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -928,7 +929,7 @@ void call_with_variant_args_static_helper_dv(T *p_instance, void (*p_method)(T *
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -939,7 +940,7 @@ void call_with_variant_args_static_helper_dv(T *p_instance, void (*p_method)(T *
 #ifdef DEBUG_ENABLED
 	if (missing > dvs) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -961,7 +962,7 @@ void call_with_variant_args_static_ret_dv(R (*p_method)(P...), const Variant **p
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -972,7 +973,7 @@ void call_with_variant_args_static_ret_dv(R (*p_method)(P...), const Variant **p
 #ifdef DEBUG_ENABLED
 	if (missing > dvs) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -994,7 +995,7 @@ void call_with_variant_args_static_dv(void (*p_method)(P...), const Variant **p_
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_MANY_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif
@@ -1005,7 +1006,7 @@ void call_with_variant_args_static_dv(void (*p_method)(P...), const Variant **p_
 #ifdef DEBUG_ENABLED
 	if (missing > dvs) {
 		r_error.error = Callable::CallError::CALL_ERROR_TOO_FEW_ARGUMENTS;
-		r_error.argument = sizeof...(P);
+		r_error.expected = sizeof...(P);
 		return;
 	}
 #endif

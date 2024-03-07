@@ -42,6 +42,12 @@ def no_verbose(sys, env):
     java_library_message = "{}Creating Java Archive {}$TARGET{} ...{}".format(
         colors["blue"], colors["bold_blue"], colors["blue"], colors["reset"]
     )
+    compiled_resource_message = "{}Creating Compiled Resource {}$TARGET{} ...{}".format(
+        colors["blue"], colors["bold_blue"], colors["blue"], colors["reset"]
+    )
+    generated_file_message = "{}Generating {}$TARGET{} ...{}".format(
+        colors["blue"], colors["bold_blue"], colors["blue"], colors["reset"]
+    )
 
     env.Append(CXXCOMSTR=[compile_source_message])
     env.Append(CCCOMSTR=[compile_source_message])
@@ -53,6 +59,8 @@ def no_verbose(sys, env):
     env.Append(LINKCOMSTR=[link_program_message])
     env.Append(JARCOMSTR=[java_library_message])
     env.Append(JAVACCOMSTR=[java_compile_source_message])
+    env.Append(RCCOMSTR=[compiled_resource_message])
+    env.Append(GENCOMSTR=[generated_file_message])
 
 
 def disable_warnings(self):
@@ -99,8 +107,8 @@ def make_icu_data(target, source, env):
 
 
 def write_macos_plist(target, binary_name, identifier, name):
-    os.makedirs(f"{target}/Resourece/", exist_ok=True)
-    f = open(f"{target}/Resourece/Info.plist", "w")
+    os.makedirs(f"{target}/Resource/", exist_ok=True)
+    f = open(f"{target}/Resource/Info.plist", "w")
 
     f.write(f'<?xml version="1.0" encoding="UTF-8"?>\n')
     f.write(f'<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n')

@@ -68,7 +68,7 @@ if env.editor_build:
     env.CommandNoCache(
         "#editor/doc_data_compressed.gen.h",
         docs,
-        env.Run(editor_builders.make_doc_header, "Generating documentation header."),
+        env.Run(editor_builders.make_doc_header),
     )
 
     # Editor interface and class reference translations incur a significant size
@@ -83,7 +83,7 @@ if env.editor_build:
     env.CommandNoCache(
         "#editor/editor_translations.gen.h",
         tlist,
-        env.Run(editor_builders.make_editor_translations_header, "Generating editor translations header."),
+        env.Run(editor_builders.make_editor_translations_header),
     )
 
     # Property translations
@@ -92,7 +92,7 @@ if env.editor_build:
     env.CommandNoCache(
         "#editor/property_translations.gen.h",
         tlist,
-        env.Run(editor_builders.make_property_translations_header, "Generating property translations header."),
+        env.Run(editor_builders.make_property_translations_header),
     )
 
     # Documentation translations
@@ -101,20 +101,16 @@ if env.editor_build:
     env.CommandNoCache(
         "#editor/doc_translations.gen.h",
         tlist,
-        env.Run(editor_builders.make_doc_translations_header, "Generating translations header."),
+        env.Run(editor_builders.make_doc_translations_header),
     )
 
-    # Fonts
-    flist = glob.glob(env.Dir("#thirdparty").abspath + "/fonts/*.ttf")
-    flist.extend(glob.glob(env.Dir("#thirdparty").abspath + "/fonts/*.otf"))
-    flist.extend(glob.glob(env.Dir("#thirdparty").abspath + "/fonts/*.woff"))
-    flist.extend(glob.glob(env.Dir("#thirdparty").abspath + "/fonts/*.woff2"))
-    flist.sort()
-    env.Depends("#editor/builtin_fonts.gen.h", flist)
+    # Extractable translations
+    tlist = glob.glob(env.Dir("#editor/translations/extractable").abspath + "/*.po")
+    env.Depends("#editor/extractable_translations.gen.h", tlist)
     env.CommandNoCache(
-        "#editor/builtin_fonts.gen.h",
-        flist,
-        env.Run(editor_builders.make_fonts_header, "Generating builtin fonts header."),
+        "#editor/extractable_translations.gen.h",
+        tlist,
+        env.Run(editor_builders.make_extractable_translations_header),
     )
 
     env.add_source_files(env.editor_sources, "*.cpp")
@@ -126,6 +122,8 @@ if env.editor_build:
     SConscript("icons/SCsub")
     SConscript("import/SCsub")
     SConscript("plugins/SCsub")
+    SConscript("project_manager/SCsub")
+    SConscript("themes/SCsub")
 
     lib = env.add_library("editor", env.editor_sources)
     env.Prepend(LIBS=[lib])

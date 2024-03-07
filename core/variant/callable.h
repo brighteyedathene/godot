@@ -69,6 +69,8 @@ public:
 		int expected = 0;
 	};
 
+	template <typename... VarArgs>
+	Variant call(VarArgs... p_args) const;
 	void callp(const Variant **p_arguments, int p_argcount, Variant &r_return_value, CallError &r_call_error) const;
 	void call_deferredp(const Variant **p_arguments, int p_argcount) const;
 	Variant callv(const Array &p_arguments) const;
@@ -97,7 +99,7 @@ public:
 	bool is_valid() const;
 
 	template <typename... VarArgs>
-	Callable bind(VarArgs... p_args);
+	Callable bind(VarArgs... p_args) const;
 	Callable bindv(const Array &p_arguments);
 
 	Callable bindp(const Variant **p_arguments, int p_argcount) const;
@@ -122,6 +124,8 @@ public:
 	void operator=(const Callable &p_callable);
 
 	operator String() const;
+
+	static Callable create(const Variant &p_variant, const StringName &p_method);
 
 	Callable(const Object *p_object, const StringName &p_method);
 	Callable(ObjectID p_object, const StringName &p_method);

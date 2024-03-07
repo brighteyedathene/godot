@@ -1,5 +1,8 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+
+#nullable enable
 
 namespace Godot
 {
@@ -147,7 +150,7 @@ namespace Godot
         /// <summary>
         /// Returns a new vector with all components rounded up (towards positive infinity).
         /// </summary>
-        /// <returns>A vector with <see cref="Mathf.Ceil"/> called on each component.</returns>
+        /// <returns>A vector with <see cref="Mathf.Ceil(real_t)"/> called on each component.</returns>
         public readonly Vector4 Ceil()
         {
             return new Vector4(Mathf.Ceil(X), Mathf.Ceil(Y), Mathf.Ceil(Z), Mathf.Ceil(W));
@@ -264,7 +267,7 @@ namespace Godot
         /// <summary>
         /// Returns a new vector with all components rounded down (towards negative infinity).
         /// </summary>
-        /// <returns>A vector with <see cref="Mathf.Floor"/> called on each component.</returns>
+        /// <returns>A vector with <see cref="Mathf.Floor(real_t)"/> called on each component.</returns>
         public readonly Vector4 Floor()
         {
             return new Vector4(Mathf.Floor(X), Mathf.Floor(Y), Mathf.Floor(Z), Mathf.Floor(W));
@@ -281,7 +284,7 @@ namespace Godot
 
         /// <summary>
         /// Returns <see langword="true"/> if this vector is finite, by calling
-        /// <see cref="Mathf.IsFinite"/> on each component.
+        /// <see cref="Mathf.IsFinite(real_t)"/> on each component.
         /// </summary>
         /// <returns>Whether this vector is finite or not.</returns>
         public readonly bool IsFinite()
@@ -832,13 +835,13 @@ namespace Godot
 
         /// <summary>
         /// Returns <see langword="true"/> if the vector is exactly equal
-        /// to the given object (<see paramref="obj"/>).
+        /// to the given object (<paramref name="obj"/>).
         /// Note: Due to floating-point precision errors, consider using
         /// <see cref="IsEqualApprox"/> instead, which is more reliable.
         /// </summary>
         /// <param name="obj">The object to compare with.</param>
         /// <returns>Whether or not the vector and the object are equal.</returns>
-        public override readonly bool Equals(object obj)
+        public override readonly bool Equals([NotNullWhen(true)] object? obj)
         {
             return obj is Vector4 other && Equals(other);
         }
@@ -884,7 +887,7 @@ namespace Godot
         /// <returns>A hash code for this vector.</returns>
         public override readonly int GetHashCode()
         {
-            return Y.GetHashCode() ^ X.GetHashCode() ^ Z.GetHashCode() ^ W.GetHashCode();
+            return HashCode.Combine(X, Y, Z, W);
         }
 
         /// <summary>
@@ -900,9 +903,11 @@ namespace Godot
         /// Converts this <see cref="Vector4"/> to a string with the given <paramref name="format"/>.
         /// </summary>
         /// <returns>A string representation of this vector.</returns>
-        public readonly string ToString(string format)
+        public readonly string ToString(string? format)
         {
+#pragma warning disable CA1305 // Disable warning: "Specify IFormatProvider"
             return $"({X.ToString(format)}, {Y.ToString(format)}, {Z.ToString(format)}, {W.ToString(format)})";
+#pragma warning restore CA1305
         }
     }
 }

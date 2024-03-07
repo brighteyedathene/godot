@@ -1,5 +1,8 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+
+#nullable enable
 
 namespace Godot
 {
@@ -150,7 +153,7 @@ namespace Godot
         /// <summary>
         /// Returns a new vector with all components rounded up (towards positive infinity).
         /// </summary>
-        /// <returns>A vector with <see cref="Mathf.Ceil"/> called on each component.</returns>
+        /// <returns>A vector with <see cref="Mathf.Ceil(real_t)"/> called on each component.</returns>
         public readonly Vector3 Ceil()
         {
             return new Vector3(Mathf.Ceil(X), Mathf.Ceil(Y), Mathf.Ceil(Z));
@@ -265,7 +268,7 @@ namespace Godot
             return new Vector3(
                 Mathf.BezierDerivative(X, control1.X, control2.X, end.X, t),
                 Mathf.BezierDerivative(Y, control1.Y, control2.Y, end.Y, t),
-                Mathf.BezierDerivative(Z, control1.Z, control2.Z, end.Y, t)
+                Mathf.BezierDerivative(Z, control1.Z, control2.Z, end.Z, t)
             );
         }
 
@@ -315,7 +318,7 @@ namespace Godot
         /// <summary>
         /// Returns a new vector with all components rounded down (towards negative infinity).
         /// </summary>
-        /// <returns>A vector with <see cref="Mathf.Floor"/> called on each component.</returns>
+        /// <returns>A vector with <see cref="Mathf.Floor(real_t)"/> called on each component.</returns>
         public readonly Vector3 Floor()
         {
             return new Vector3(Mathf.Floor(X), Mathf.Floor(Y), Mathf.Floor(Z));
@@ -332,7 +335,7 @@ namespace Godot
 
         /// <summary>
         /// Returns <see langword="true"/> if this vector is finite, by calling
-        /// <see cref="Mathf.IsFinite"/> on each component.
+        /// <see cref="Mathf.IsFinite(real_t)"/> on each component.
         /// </summary>
         /// <returns>Whether this vector is finite or not.</returns>
         public readonly bool IsFinite()
@@ -511,7 +514,10 @@ namespace Godot
         }
 
         /// <summary>
-        /// Returns this vector projected onto another vector <paramref name="onNormal"/>.
+        /// Returns a new vector resulting from projecting this vector onto the given vector <paramref name="onNormal"/>.
+        /// The resulting new vector is parallel to <paramref name="onNormal"/>.
+        /// See also <see cref="Slide(Vector3)"/>.
+        /// Note: If the vector <paramref name="onNormal"/> is a zero vector, the components of the resulting new vector will be <see cref="real_t.NaN"/>.
         /// </summary>
         /// <param name="onNormal">The vector to project onto.</param>
         /// <returns>The projected vector.</returns>
@@ -623,9 +629,12 @@ namespace Godot
         }
 
         /// <summary>
-        /// Returns this vector slid along a plane defined by the given <paramref name="normal"/>.
+        /// Returns a new vector resulting from sliding this vector along a plane with normal <paramref name="normal"/>.
+        /// The resulting new vector is perpendicular to <paramref name="normal"/>, and is equivalent to this vector minus its projection on <paramref name="normal"/>.
+        /// See also <see cref="Project(Vector3)"/>.
+        /// Note: The vector <paramref name="normal"/> must be normalized. See also <see cref="Normalized()"/>.
         /// </summary>
-        /// <param name="normal">The normal vector defining the plane to slide on.</param>
+        /// <param name="normal">The normal vector of the plane to slide on.</param>
         /// <returns>The slid vector.</returns>
         public readonly Vector3 Slide(Vector3 normal)
         {
@@ -1050,13 +1059,13 @@ namespace Godot
 
         /// <summary>
         /// Returns <see langword="true"/> if the vector is exactly equal
-        /// to the given object (<see paramref="obj"/>).
+        /// to the given object (<paramref name="obj"/>).
         /// Note: Due to floating-point precision errors, consider using
         /// <see cref="IsEqualApprox"/> instead, which is more reliable.
         /// </summary>
         /// <param name="obj">The object to compare with.</param>
         /// <returns>Whether or not the vector and the object are equal.</returns>
-        public override readonly bool Equals(object obj)
+        public override readonly bool Equals([NotNullWhen(true)] object? obj)
         {
             return obj is Vector3 other && Equals(other);
         }
@@ -1102,7 +1111,7 @@ namespace Godot
         /// <returns>A hash code for this vector.</returns>
         public override readonly int GetHashCode()
         {
-            return Y.GetHashCode() ^ X.GetHashCode() ^ Z.GetHashCode();
+            return HashCode.Combine(X, Y, Z);
         }
 
         /// <summary>
@@ -1118,9 +1127,11 @@ namespace Godot
         /// Converts this <see cref="Vector3"/> to a string with the given <paramref name="format"/>.
         /// </summary>
         /// <returns>A string representation of this vector.</returns>
-        public readonly string ToString(string format)
+        public readonly string ToString(string? format)
         {
+#pragma warning disable CA1305 // Disable warning: "Specify IFormatProvider"
             return $"({X.ToString(format)}, {Y.ToString(format)}, {Z.ToString(format)})";
+#pragma warning restore CA1305
         }
     }
 }

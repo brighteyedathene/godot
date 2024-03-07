@@ -65,15 +65,15 @@ class AcceptDialog : public Window {
 
 	static bool swap_cancel_ok;
 
-	void _input_from_window(const Ref<InputEvent> &p_event);
 	void _parent_focused();
 
 protected:
 	virtual Size2 _get_contents_minimum_size() const override;
-	virtual void _update_theme_item_cache() override;
+	virtual void _input_from_window(const Ref<InputEvent> &p_event) override;
 
 	void _notification(int p_what);
 	static void _bind_methods();
+
 	virtual void ok_pressed() {}
 	virtual void cancel_pressed() {}
 	virtual void custom_action(const String &) {}

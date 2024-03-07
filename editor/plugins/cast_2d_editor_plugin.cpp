@@ -33,8 +33,8 @@
 #include "canvas_item_editor_plugin.h"
 #include "editor/editor_node.h"
 #include "editor/editor_undo_redo_manager.h"
-#include "scene/2d/ray_cast_2d.h"
-#include "scene/2d/shape_cast_2d.h"
+#include "scene/2d/physics/ray_cast_2d.h"
+#include "scene/2d/physics/shape_cast_2d.h"
 
 void Cast2DEditor::_notification(int p_what) {
 	switch (p_what) {
@@ -113,7 +113,7 @@ void Cast2DEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 
 	Transform2D gt = canvas_item_editor->get_canvas_transform() * node->get_global_transform();
 
-	const Ref<Texture2D> handle = get_theme_icon(SNAME("EditorHandle"), SNAME("EditorIcons"));
+	const Ref<Texture2D> handle = get_editor_theme_icon(SNAME("EditorHandle"));
 	p_overlay->draw_texture(handle, gt.xform((Vector2)node->get("target_position")) - handle->get_size() / 2);
 }
 

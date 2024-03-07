@@ -34,9 +34,14 @@
 #include "core/io/dir_access.h"
 #include "main/main.h"
 #include "servers/display_server.h"
+#include "servers/rendering_server.h"
 
 #ifdef X11_ENABLED
 #include "x11/display_server_x11.h"
+#endif
+
+#ifdef WAYLAND_ENABLED
+#include "wayland/display_server_wayland.h"
 #endif
 
 #include "modules/modules_enabled.gen.h" // For regex.
@@ -162,6 +167,27 @@ String OS_LinuxBSD::get_processor_name() const {
 	}
 
 	ERR_FAIL_V_MSG("", String("Couldn't get the CPU model name from `/proc/cpuinfo`. Returning an empty string."));
+}
+
+bool OS_LinuxBSD::is_sandboxed() const {
+	// This function is derived from SDL:
+	// https://github.com/libsdl-org/SDL/blob/main/src/core/linux/SDL_sandbox.c#L28-L45
+
+	if (access("/.flatpak-info", F_OK) == 0) {
+		return true;
+	}
+
+	// For Snap, we check multiple variables because they might be set for
+	// unrelated reasons. This is the same thing WebKitGTK does.
+	if (has_environment("SNAP") && has_environment("SNAP_NAME") && has_environment("SNAP_REVISION")) {
+		return true;
+	}
+
+	if (access("/run/host/container-manager", F_OK) == 0) {
+		return true;
+	}
+
+	return false;
 }
 
 void OS_LinuxBSD::finalize() {
@@ -295,7 +321,7 @@ Vector<String> OS_LinuxBSD::get_video_adapter_driver_info() const {
 			continue;
 		}
 		String device_class = columns[1].trim_suffix(":");
-		String vendor_device_id_mapping = columns[2];
+		const String &vendor_device_id_mapping = columns[2];
 
 #ifdef MODULE_REGEX_ENABLED
 		if (regex_id_format.search(vendor_device_id_mapping).is_null()) {
@@ -453,7 +479,7 @@ Vector<String> OS_LinuxBSD::lspci_get_device_value(Vector<String> vendor_device_
 	return values;
 }
 
-Error OS_LinuxBSD::shell_open(String p_uri) {
+Error OS_LinuxBSD::shell_open(const String &p_uri) {
 	Error ok;
 	int err_code;
 	List<String> args;
@@ -1143,6 +1169,10 @@ OS_LinuxBSD::OS_LinuxBSD() {
 
 #ifdef X11_ENABLED
 	DisplayServerX11::register_x11_driver();
+#endif
+
+#ifdef WAYLAND_ENABLED
+	DisplayServerWayland::register_wayland_driver();
 #endif
 
 #ifdef FONTCONFIG_ENABLED

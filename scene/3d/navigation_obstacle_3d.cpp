@@ -31,8 +31,6 @@
 #include "navigation_obstacle_3d.h"
 
 #include "core/math/geometry_2d.h"
-#include "scene/3d/collision_shape_3d.h"
-#include "scene/3d/physics_body_3d.h"
 #include "servers/navigation_server_3d.h"
 
 void NavigationObstacle3D::_bind_methods() {
@@ -134,6 +132,19 @@ void NavigationObstacle3D::_notification(int p_what) {
 			NavigationServer3D::get_singleton()->obstacle_set_paused(obstacle, !can_process());
 		} break;
 
+#ifdef DEBUG_ENABLED
+		case NOTIFICATION_VISIBILITY_CHANGED: {
+			if (is_inside_tree()) {
+				if (fake_agent_radius_debug_instance.is_valid()) {
+					RS::get_singleton()->instance_set_visible(fake_agent_radius_debug_instance, is_visible_in_tree());
+				}
+				if (static_obstacle_debug_instance.is_valid()) {
+					RS::get_singleton()->instance_set_visible(static_obstacle_debug_instance, is_visible_in_tree());
+				}
+			}
+		} break;
+#endif // DEBUG_ENABLED
+
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
 			if (is_inside_tree()) {
 				_update_position(get_global_transform().origin);
@@ -148,10 +159,14 @@ void NavigationObstacle3D::_notification(int p_what) {
 				}
 #ifdef DEBUG_ENABLED
 				if (fake_agent_radius_debug_instance.is_valid() && radius > 0.0) {
-					RS::get_singleton()->instance_set_transform(fake_agent_radius_debug_instance, get_global_transform());
+					Transform3D debug_transform;
+					debug_transform.origin = get_global_position();
+					RS::get_singleton()->instance_set_transform(fake_agent_radius_debug_instance, debug_transform);
 				}
 				if (static_obstacle_debug_instance.is_valid() && get_vertices().size() > 0) {
-					RS::get_singleton()->instance_set_transform(static_obstacle_debug_instance, get_global_transform());
+					Transform3D debug_transform;
+					debug_transform.origin = get_global_position();
+					RS::get_singleton()->instance_set_transform(static_obstacle_debug_instance, debug_transform);
 				}
 #endif // DEBUG_ENABLED
 			}
@@ -162,12 +177,12 @@ void NavigationObstacle3D::_notification(int p_what) {
 NavigationObstacle3D::NavigationObstacle3D() {
 	obstacle = NavigationServer3D::get_singleton()->obstacle_create();
 
-	set_radius(radius);
-	set_height(height);
-	set_vertices(vertices);
-	set_avoidance_layers(avoidance_layers);
-	set_avoidance_enabled(avoidance_enabled);
-	set_use_3d_avoidance(use_3d_avoidance);
+	NavigationServer3D::get_singleton()->obstacle_set_height(obstacle, height);
+	NavigationServer3D::get_singleton()->obstacle_set_radius(obstacle, radius);
+	NavigationServer3D::get_singleton()->obstacle_set_vertices(obstacle, vertices);
+	NavigationServer3D::get_singleton()->obstacle_set_avoidance_layers(obstacle, avoidance_layers);
+	NavigationServer3D::get_singleton()->obstacle_set_use_3d_avoidance(obstacle, use_3d_avoidance);
+	NavigationServer3D::get_singleton()->obstacle_set_avoidance_enabled(obstacle, avoidance_enabled);
 
 #ifdef DEBUG_ENABLED
 	NavigationServer3D::get_singleton()->connect("avoidance_debug_changed", callable_mp(this, &NavigationObstacle3D::_update_fake_agent_radius_debug));

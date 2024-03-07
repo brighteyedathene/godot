@@ -30,14 +30,14 @@
 
 #include "callable.h"
 
-#include "callable_bind.h"
-#include "core/object/message_queue.h"
 #include "core/object/object.h"
 #include "core/object/ref_counted.h"
 #include "core/object/script_language.h"
+#include "core/variant/callable_bind.h"
+#include "core/variant/variant_callable.h"
 
 void Callable::call_deferredp(const Variant **p_arguments, int p_argcount) const {
-	MessageQueue::get_singleton()->push_callablep(*this, p_arguments, p_argcount);
+	MessageQueue::get_singleton()->push_callablep(*this, p_arguments, p_argcount, true);
 }
 
 void Callable::callp(const Variant **p_arguments, int p_argcount, Variant &r_return_value, CallError &r_call_error) const {
@@ -47,6 +47,13 @@ void Callable::callp(const Variant **p_arguments, int p_argcount, Variant &r_ret
 		r_call_error.expected = 0;
 		r_return_value = Variant();
 	} else if (is_custom()) {
+		if (!is_valid()) {
+			r_call_error.error = CallError::CALL_ERROR_INSTANCE_IS_NULL;
+			r_call_error.argument = 0;
+			r_call_error.expected = 0;
+			r_return_value = Variant();
+			return;
+		}
 		custom->call(p_arguments, p_argcount, r_return_value, r_call_error);
 	} else {
 		Object *obj = ObjectDB::get_instance(ObjectID(object));
@@ -321,14 +328,27 @@ Callable::operator String() const {
 	}
 }
 
-Callable::Callable(const Object *p_object, const StringName &p_method) {
-	if (p_method == StringName()) {
-		object = 0;
-		ERR_FAIL_MSG("Method argument to Callable constructor must be a non-empty string");
+Callable Callable::create(const Variant &p_variant, const StringName &p_method) {
+	ERR_FAIL_COND_V_MSG(p_method == StringName(), Callable(), "Method argument to Callable::create method must be a non-empty string.");
+
+	switch (p_variant.get_type()) {
+		case Variant::NIL:
+			return Callable(ObjectID(), p_method);
+		case Variant::OBJECT:
+			return Callable(p_variant.operator ObjectID(), p_method);
+		default:
+			return Callable(memnew(VariantCallable(p_variant, p_method)));
 	}
-	if (p_object == nullptr) {
+}
+
+Callable::Callable(const Object *p_object, const StringName &p_method) {
+	if (unlikely(p_method == StringName())) {
 		object = 0;
-		ERR_FAIL_MSG("Object argument to Callable constructor must be non-null");
+		ERR_FAIL_MSG("Method argument to Callable constructor must be a non-empty string.");
+	}
+	if (unlikely(p_object == nullptr)) {
+		object = 0;
+		ERR_FAIL_MSG("Object argument to Callable constructor must be non-null.");
 	}
 
 	object = p_object->get_instance_id();
@@ -336,9 +356,9 @@ Callable::Callable(const Object *p_object, const StringName &p_method) {
 }
 
 Callable::Callable(ObjectID p_object, const StringName &p_method) {
-	if (p_method == StringName()) {
+	if (unlikely(p_method == StringName())) {
 		object = 0;
-		ERR_FAIL_MSG("Method argument to Callable constructor must be a non-empty string");
+		ERR_FAIL_MSG("Method argument to Callable constructor must be a non-empty string.");
 	}
 
 	object = p_object;
@@ -346,9 +366,9 @@ Callable::Callable(ObjectID p_object, const StringName &p_method) {
 }
 
 Callable::Callable(CallableCustom *p_custom) {
-	if (p_custom->referenced) {
+	if (unlikely(p_custom->referenced)) {
 		object = 0;
-		ERR_FAIL_MSG("Callable custom is already referenced");
+		ERR_FAIL_MSG("Callable custom is already referenced.");
 	}
 	p_custom->referenced = true;
 	object = 0; //ensure object is all zero, since pointer may be 32 bits
@@ -465,20 +485,20 @@ Error Signal::emit(const Variant **p_arguments, int p_argcount) const {
 
 Error Signal::connect(const Callable &p_callable, uint32_t p_flags) {
 	Object *obj = get_object();
-	ERR_FAIL_COND_V(!obj, ERR_UNCONFIGURED);
+	ERR_FAIL_NULL_V(obj, ERR_UNCONFIGURED);
 
 	return obj->connect(name, p_callable, p_flags);
 }
 
 void Signal::disconnect(const Callable &p_callable) {
 	Object *obj = get_object();
-	ERR_FAIL_COND(!obj);
+	ERR_FAIL_NULL(obj);
 	obj->disconnect(name, p_callable);
 }
 
 bool Signal::is_connected(const Callable &p_callable) const {
 	Object *obj = get_object();
-	ERR_FAIL_COND_V(!obj, false);
+	ERR_FAIL_NULL_V(obj, false);
 
 	return obj->is_connected(name, p_callable);
 }
@@ -500,7 +520,7 @@ Array Signal::get_connections() const {
 }
 
 Signal::Signal(const Object *p_object, const StringName &p_name) {
-	ERR_FAIL_COND_MSG(p_object == nullptr, "Object argument to Signal constructor must be non-null");
+	ERR_FAIL_NULL_MSG(p_object, "Object argument to Signal constructor must be non-null.");
 
 	object = p_object->get_instance_id();
 	name = p_name;
