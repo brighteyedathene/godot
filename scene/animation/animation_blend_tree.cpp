@@ -224,14 +224,11 @@ String AnimationNodeAnimationPose::get_caption() const {
 	return "AnimationPose";
 }
 
-double AnimationNodeAnimationPose::_process(double p_time, bool p_seek, bool p_is_external_seeking, bool p_test_only) {
-	AnimationPlayer *ap = state->player;
-	ERR_FAIL_NULL_V(ap, 0);
-
+double AnimationNodeAnimationPose::_process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only) {
 	double cur_time = get_parameter(time);
 
-	if (!ap->has_animation(animation)) {
-		AnimationNodeBlendTree *tree = Object::cast_to<AnimationNodeBlendTree>(parent);
+	if (!process_state->tree->has_animation(animation)) {
+		AnimationNodeBlendTree *tree = Object::cast_to<AnimationNodeBlendTree>(node_state.parent);
 		if (tree) {
 			String node_name = tree->get_node_name(Ref<AnimationNodeAnimation>(this));
 			make_invalid(vformat(RTR("On BlendTree node '%s', animation not found: '%s'"), node_name, animation));
@@ -243,14 +240,18 @@ double AnimationNodeAnimationPose::_process(double p_time, bool p_seek, bool p_i
 		return 0;
 	}
 
-	Ref<Animation> anim = ap->get_animation(animation);
+	Ref<Animation> anim = process_state->tree->get_animation(animation);
 	double anim_size = (double)anim->get_length();
 	double step = 0.0;
 	double prev_time = cur_time;
 	Animation::LoopedFlag looped_flag = Animation::LOOPED_FLAG_NONE;
 	bool node_backward = play_mode == PLAY_MODE_BACKWARD;
 
-	if (p_seek) {
+	double p_time = p_playback_info.time;
+	bool p_seek = p_playback_info.seeked;
+	bool p_is_external_seeking = p_playback_info.is_external_seeking;
+
+	if (p_playback_info.seeked) {
 		step = p_time - cur_time;
 		cur_time = p_time;
 	} else {
@@ -309,25 +310,31 @@ double AnimationNodeAnimationPose::_process(double p_time, bool p_seek, bool p_i
 		}
 
 		// Emit start & finish signal. Internally, the detections are the same for backward.
-		// We should use call_deferred since the track keys are still being prosessed.
-		if (state->tree) {
+		// We should use call_deferred since the track keys are still being processed.
+		if (process_state->tree && !p_test_only) {
 			// AnimationTree uses seek to 0 "internally" to process the first key of the animation, which is used as the start detection.
 			if (p_seek && !p_is_external_seeking && cur_time == 0) {
-				state->tree->call_deferred(SNAME("emit_signal"), "animation_started", animation);
+				process_state->tree->call_deferred(SNAME("emit_signal"), "animation_started", animation);
 			}
 			// Finished.
 			if (prev_time < anim_size && cur_time >= anim_size) {
-				state->tree->call_deferred(SNAME("emit_signal"), "animation_finished", animation);
+				process_state->tree->call_deferred(SNAME("emit_signal"), "animation_finished", animation);
 			}
 		}
 	}
 
 	if (!p_test_only) {
+		AnimationMixer::PlaybackInfo pi = p_playback_info;
 		if (play_mode == PLAY_MODE_FORWARD) {
-			blend_animation(animation, cur_time, 0/*step*/, p_seek, p_is_external_seeking, 1.0, looped_flag);
+			pi.time = cur_time;
+			pi.delta = 0 /*step*/;
 		} else {
-			blend_animation(animation, anim_size - cur_time, 0/*-step*/, p_seek, p_is_external_seeking, 1.0, looped_flag);
+			pi.time = anim_size - cur_time;
+			pi.delta = 0 /*-step*/;
 		}
+		pi.weight = 1.0;
+		pi.looped_flag = looped_flag;
+		blend_animation(animation, pi);
 	}
 	set_parameter(time, cur_time);
 
@@ -930,19 +937,21 @@ String AnimationNodeTimeSeekFake::get_caption() const {
 	return "TimeSeekFake";
 }
 
-double AnimationNodeTimeSeekFake::_process(double p_time, bool p_seek, bool p_is_external_seeking, bool p_test_only) {
+double AnimationNodeTimeSeekFake::_process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only) {
 	/* Basically identical except I always set p_seek to false. Hopefully this will let me skip event notifies
 	*/
 	double cur_seek_pos = get_parameter(seek_pos_request);
-	if (p_seek) {
-		return blend_input(0, p_time, false, p_is_external_seeking, 1.0, FILTER_IGNORE, true, p_test_only);
-	} else if (cur_seek_pos >= 0) {
-		double ret = blend_input(0, cur_seek_pos, false, true, 1.0, FILTER_IGNORE, true, p_test_only);
+
+	AnimationMixer::PlaybackInfo pi = p_playback_info;
+	pi.weight = 1.0;
+	pi.seeked = false;
+	if (cur_seek_pos >= 0) {
+		pi.time = cur_seek_pos;
+		pi.is_external_seeking = true;
 		set_parameter(seek_pos_request, -1.0); // Reset.
-		return ret;
-	} else {
-		return blend_input(0, p_time, false, p_is_external_seeking, 1.0, FILTER_IGNORE, true, p_test_only);
 	}
+
+	return blend_input(0, pi, FILTER_IGNORE, true, p_test_only);
 }
 
 /////////////////////////////////////////////////

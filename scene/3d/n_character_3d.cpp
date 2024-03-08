@@ -29,11 +29,6 @@
 /**************************************************************************/
 
 #include "n_character_3d.h"
-#include "scene/3d/collision_shape_3d.h"
-#include "scene/scene_string_names.h"
-#include "servers/physics_server_3d.h"
-
-
 
 
 //so, if you pass 45 as limit, avoid numerical precision errors when angle is 45.

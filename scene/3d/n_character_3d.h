@@ -31,14 +31,8 @@
 #ifndef N_CHARACTER_3D_H
 #define N_CHARACTER_3D_H
 
-#include "core/templates/vset.h"
-#include "scene/3d/collision_object_3d.h"
-#include "scene/resources/physics_material.h"
-#include "servers/physics_server_3d.h"
-#include "skeleton_3d.h"
-#include "physics_body_3d.h"
-
-
+#include "scene/3d/physics/kinematic_collision_3d.h"
+#include "scene/3d/physics/physics_body_3d.h"
 
 
 class NCharacter3D : public PhysicsBody3D {

@@ -440,6 +440,7 @@ Vector<AudioFrame> AudioStreamPlayer3D::_update_panning() {
 			linear_attenuation = Math::db_to_linear(db_att);
 			for (Ref<AudioStreamPlayback> &playback : internal->stream_playbacks) {
 				AudioServer::get_singleton()->set_playback_highshelf_params(playback, linear_attenuation, attenuation_filter_cutoff_hz);
+			}
 		}
 		// Bake in a constant factor here to allow the project setting defaults for 2d and 3d to be normalized to 1.0.
 		float tightness = cached_global_panning_strength * 2.0f;
