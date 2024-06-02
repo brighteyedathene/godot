@@ -1,0 +1,18 @@
+notes
+
+what does visibility component need?
+
+	reading:
+		invisible tag
+		visibility (for a particular viewer...)
+
+		node3d position
+		vision target positions
+
+
+	writing:
+		positions must be writable though, and probably update somewhere....
+		I just need to know if there's LOS to this thing
+
+	other things about the character? naaaaaaaah
+	I think the expensive stuff should be done here, and the messy stuff should be done in gdscrip

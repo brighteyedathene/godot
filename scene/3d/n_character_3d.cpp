@@ -1163,11 +1163,6 @@ void NCharacter3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_max_step_lookahead"), &NCharacter3D::get_max_step_lookahead);
 	ClassDB::bind_method(D_METHOD("set_max_step_lookahead", "max_step_lookahead"), &NCharacter3D::set_max_step_lookahead);
 
-	ClassDB::bind_method(D_METHOD("get_last_step_ray_start"), &NCharacter3D::get_last_step_ray_start);
-	ClassDB::bind_method(D_METHOD("set_last_step_ray_start", "last_step_ray_start"), &NCharacter3D::set_last_step_ray_start);
-	ClassDB::bind_method(D_METHOD("get_last_step_ray_end"), &NCharacter3D::get_last_step_ray_end);
-	ClassDB::bind_method(D_METHOD("set_last_step_ray_end", "last_step_ray_end"), &NCharacter3D::set_last_step_ray_end);
-
 	ClassDB::bind_method(D_METHOD("get_wall_min_slide_angle"), &NCharacter3D::get_wall_min_slide_angle);
 	ClassDB::bind_method(D_METHOD("set_wall_min_slide_angle", "radians"), &NCharacter3D::set_wall_min_slide_angle);
 	ClassDB::bind_method(D_METHOD("get_up_direction"), &NCharacter3D::get_up_direction);
@@ -1199,9 +1194,6 @@ void NCharacter3D::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "motion_mode", PROPERTY_HINT_ENUM, "Grounded,Floating", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), "set_motion_mode", "get_motion_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "up_direction"), "set_up_direction", "get_up_direction");
-
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "last_step_ray_start"), "get_last_step_ray_start", "set_last_step_ray_start");
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "last_step_ray_end"), "get_last_step_ray_end", "set_last_step_ray_end");
 
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "slide_on_ceiling"), "set_slide_on_ceiling_enabled", "is_slide_on_ceiling_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "velocity", PROPERTY_HINT_NONE, "suffix:m/s", PROPERTY_USAGE_NO_EDITOR), "set_velocity", "get_velocity");

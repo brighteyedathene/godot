@@ -170,12 +170,6 @@ private:
 	real_t get_max_step_lookahead() const { return max_step_lookahead; };
 	void set_max_step_lookahead(real_t p_meters) { max_step_lookahead = p_meters; };
 
-	Vector3 get_last_step_ray_start() const { return last_step_ray_start; };
-	void set_last_step_ray_start(Vector3 p_last_step_ray_start) { last_step_ray_start = p_last_step_ray_start; };
-
-	Vector3 get_last_step_ray_end() const { return last_step_ray_end; };
-	void set_last_step_ray_end(Vector3 p_last_step_ray_end) { last_step_ray_end = p_last_step_ray_end; };
-
 	real_t get_floor_snap_length();
 	void set_floor_snap_length(real_t p_floor_snap_length);
 
