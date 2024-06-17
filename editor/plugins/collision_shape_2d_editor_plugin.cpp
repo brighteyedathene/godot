@@ -43,7 +43,6 @@
 #include "scene/resources/2d/segment_shape_2d.h"
 #include "scene/resources/2d/separation_ray_shape_2d.h"
 #include "scene/resources/2d/world_boundary_shape_2d.h"
-#include "scene/scene_string_names.h"
 
 CollisionShape2DEditor::CollisionShape2DEditor() {
 	grab_threshold = EDITOR_GET("editors/polygon_editor/point_grab_radius");
@@ -326,6 +325,7 @@ bool CollisionShape2DEditor::forward_canvas_gui_input(const Ref<InputEvent> &p_e
 					return false;
 				}
 
+				original_mouse_pos = gpoint;
 				original_point = handles[edit_handle];
 				original = get_handle_value(edit_handle);
 				original_transform = node->get_global_transform();
@@ -336,7 +336,9 @@ bool CollisionShape2DEditor::forward_canvas_gui_input(const Ref<InputEvent> &p_e
 
 			} else {
 				if (pressed) {
-					commit_handle(edit_handle, original);
+					if (original_mouse_pos != gpoint) {
+						commit_handle(edit_handle, original);
+					}
 
 					edit_handle = -1;
 					pressed = false;
@@ -384,7 +386,7 @@ void CollisionShape2DEditor::_shape_changed() {
 	canvas_item_editor->update_viewport();
 
 	if (current_shape.is_valid()) {
-		current_shape->disconnect(SceneStringNames::get_singleton()->changed, callable_mp(canvas_item_editor, &CanvasItemEditor::update_viewport));
+		current_shape->disconnect_changed(callable_mp(canvas_item_editor, &CanvasItemEditor::update_viewport));
 		current_shape = Ref<Shape2D>();
 		shape_type = -1;
 	}
@@ -396,7 +398,7 @@ void CollisionShape2DEditor::_shape_changed() {
 	current_shape = node->get_shape();
 
 	if (current_shape.is_valid()) {
-		current_shape->connect(SceneStringNames::get_singleton()->changed, callable_mp(canvas_item_editor, &CanvasItemEditor::update_viewport));
+		current_shape->connect_changed(callable_mp(canvas_item_editor, &CanvasItemEditor::update_viewport));
 	} else {
 		return;
 	}

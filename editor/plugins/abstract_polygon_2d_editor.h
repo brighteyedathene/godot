@@ -31,7 +31,7 @@
 #ifndef ABSTRACT_POLYGON_2D_EDITOR_H
 #define ABSTRACT_POLYGON_2D_EDITOR_H
 
-#include "editor/editor_plugin.h"
+#include "editor/plugins/editor_plugin.h"
 #include "scene/2d/polygon_2d.h"
 #include "scene/gui/box_container.h"
 
@@ -79,6 +79,7 @@ class AbstractPolygon2DEditor : public HBoxContainer {
 	Vertex hover_point; // point under mouse cursor
 	Vertex selected_point; // currently selected
 	PosVertex edge_point; // adding an edge point?
+	Vector2 original_mouse_pos;
 
 	Vector<Vector2> pre_move_edit;
 	Vector<Vector2> wip;

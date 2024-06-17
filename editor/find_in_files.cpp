@@ -47,7 +47,6 @@
 #include "scene/gui/tree.h"
 
 const char *FindInFiles::SIGNAL_RESULT_FOUND = "result_found";
-const char *FindInFiles::SIGNAL_FINISHED = "finished";
 
 // TODO: Would be nice in Vector and Vectors.
 template <typename T>
@@ -115,12 +114,12 @@ void FindInFiles::_notification(int p_what) {
 void FindInFiles::start() {
 	if (_pattern.is_empty()) {
 		print_verbose("Nothing to search, pattern is empty");
-		emit_signal(SNAME(SIGNAL_FINISHED));
+		emit_signal(SceneStringName(finished));
 		return;
 	}
 	if (_extension_filter.size() == 0) {
 		print_verbose("Nothing to search, filter matches no files");
-		emit_signal(SNAME(SIGNAL_FINISHED));
+		emit_signal(SceneStringName(finished));
 		return;
 	}
 
@@ -202,7 +201,7 @@ void FindInFiles::_iterate() {
 		set_process(false);
 		_current_dir = "";
 		_searching = false;
-		emit_signal(SNAME(SIGNAL_FINISHED));
+		emit_signal(SceneStringName(finished));
 	}
 }
 
@@ -222,7 +221,9 @@ void FindInFiles::_scan_dir(const String &path, PackedStringArray &out_folders, 
 
 	dir->list_dir_begin();
 
-	for (int i = 0; i < 1000; ++i) {
+	// Limit to 100,000 iterations to avoid an infinite loop just in case
+	// (this technically limits results to 100,000 files per folder).
+	for (int i = 0; i < 100'000; ++i) {
 		String file = dir->get_next();
 
 		if (file.is_empty()) {
@@ -290,7 +291,7 @@ void FindInFiles::_bind_methods() {
 			PropertyInfo(Variant::INT, "end"),
 			PropertyInfo(Variant::STRING, "text")));
 
-	ADD_SIGNAL(MethodInfo(SIGNAL_FINISHED));
+	ADD_SIGNAL(MethodInfo("finished"));
 }
 
 //-----------------------------------------------------------------------------
@@ -366,7 +367,7 @@ FindInFilesDialog::FindInFilesDialog() {
 
 		Button *folder_button = memnew(Button);
 		folder_button->set_text("...");
-		folder_button->connect("pressed", callable_mp(this, &FindInFilesDialog::_on_folder_button_pressed));
+		folder_button->connect(SceneStringName(pressed), callable_mp(this, &FindInFilesDialog::_on_folder_button_pressed));
 		hbc->add_child(folder_button);
 
 		_folder_dialog = memnew(FileDialog);
@@ -398,8 +399,24 @@ FindInFilesDialog::FindInFilesDialog() {
 }
 
 void FindInFilesDialog::set_search_text(const String &text) {
-	_search_text_line_edit->set_text(text);
-	_on_search_text_modified(text);
+	if (_mode == SEARCH_MODE) {
+		if (!text.is_empty()) {
+			_search_text_line_edit->set_text(text);
+			_on_search_text_modified(text);
+		}
+		callable_mp((Control *)_search_text_line_edit, &Control::grab_focus).call_deferred();
+		_search_text_line_edit->select_all();
+	} else if (_mode == REPLACE_MODE) {
+		if (!text.is_empty()) {
+			_search_text_line_edit->set_text(text);
+			callable_mp((Control *)_replace_text_line_edit, &Control::grab_focus).call_deferred();
+			_replace_text_line_edit->select_all();
+			_on_search_text_modified(text);
+		} else {
+			callable_mp((Control *)_search_text_line_edit, &Control::grab_focus).call_deferred();
+			_search_text_line_edit->select_all();
+		}
+	}
 }
 
 void FindInFilesDialog::set_replace_text(const String &text) {
@@ -464,9 +481,6 @@ void FindInFilesDialog::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_VISIBILITY_CHANGED: {
 			if (is_visible()) {
-				// Doesn't work more than once if not deferred...
-				callable_mp((Control *)_search_text_line_edit, &Control::grab_focus).call_deferred();
-				_search_text_line_edit->select_all();
 				// Extensions might have changed in the meantime, we clean them and instance them again.
 				for (int i = 0; i < _filters_container->get_child_count(); i++) {
 					_filters_container->get_child(i)->queue_free();
@@ -553,11 +567,12 @@ void FindInFilesDialog::_bind_methods() {
 //-----------------------------------------------------------------------------
 const char *FindInFilesPanel::SIGNAL_RESULT_SELECTED = "result_selected";
 const char *FindInFilesPanel::SIGNAL_FILES_MODIFIED = "files_modified";
+const char *FindInFilesPanel::SIGNAL_CLOSE_BUTTON_CLICKED = "close_button_clicked";
 
 FindInFilesPanel::FindInFilesPanel() {
 	_finder = memnew(FindInFiles);
 	_finder->connect(FindInFiles::SIGNAL_RESULT_FOUND, callable_mp(this, &FindInFilesPanel::_on_result_found));
-	_finder->connect(FindInFiles::SIGNAL_FINISHED, callable_mp(this, &FindInFilesPanel::_on_finished));
+	_finder->connect(SceneStringName(finished), callable_mp(this, &FindInFilesPanel::_on_finished));
 	add_child(_finder);
 
 	VBoxContainer *vbc = memnew(VBoxContainer);
@@ -588,20 +603,26 @@ FindInFilesPanel::FindInFilesPanel() {
 
 		_refresh_button = memnew(Button);
 		_refresh_button->set_text(TTR("Refresh"));
-		_refresh_button->connect("pressed", callable_mp(this, &FindInFilesPanel::_on_refresh_button_clicked));
+		_refresh_button->connect(SceneStringName(pressed), callable_mp(this, &FindInFilesPanel::_on_refresh_button_clicked));
 		_refresh_button->hide();
 		hbc->add_child(_refresh_button);
 
 		_cancel_button = memnew(Button);
 		_cancel_button->set_text(TTR("Cancel"));
-		_cancel_button->connect("pressed", callable_mp(this, &FindInFilesPanel::_on_cancel_button_clicked));
+		_cancel_button->connect(SceneStringName(pressed), callable_mp(this, &FindInFilesPanel::_on_cancel_button_clicked));
 		_cancel_button->hide();
 		hbc->add_child(_cancel_button);
+
+		_close_button = memnew(Button);
+		_close_button->set_text(TTR("Close"));
+		_close_button->connect(SceneStringName(pressed), callable_mp(this, &FindInFilesPanel::_on_close_button_clicked));
+		hbc->add_child(_close_button);
 
 		vbc->add_child(hbc);
 	}
 
 	_results_display = memnew(Tree);
+	_results_display->set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
 	_results_display->set_v_size_flags(SIZE_EXPAND_FILL);
 	_results_display->connect("item_selected", callable_mp(this, &FindInFilesPanel::_on_result_selected));
 	_results_display->connect("item_edited", callable_mp(this, &FindInFilesPanel::_on_item_edited));
@@ -628,7 +649,7 @@ FindInFilesPanel::FindInFilesPanel() {
 
 		_replace_all_button = memnew(Button);
 		_replace_all_button->set_text(TTR("Replace all (no undo)"));
-		_replace_all_button->connect("pressed", callable_mp(this, &FindInFilesPanel::_on_replace_all_clicked));
+		_replace_all_button->connect(SceneStringName(pressed), callable_mp(this, &FindInFilesPanel::_on_replace_all_clicked));
 		_replace_container->add_child(_replace_all_button);
 
 		_replace_container->hide();
@@ -829,6 +850,10 @@ void FindInFilesPanel::_on_cancel_button_clicked() {
 	stop_search();
 }
 
+void FindInFilesPanel::_on_close_button_clicked() {
+	emit_signal(SNAME(SIGNAL_CLOSE_BUTTON_CLICKED));
+}
+
 void FindInFilesPanel::_on_result_selected() {
 	TreeItem *item = _results_display->get_selected();
 	HashMap<TreeItem *, Result>::Iterator E = _result_items.find(item);
@@ -996,4 +1021,6 @@ void FindInFilesPanel::_bind_methods() {
 			PropertyInfo(Variant::INT, "end")));
 
 	ADD_SIGNAL(MethodInfo(SIGNAL_FILES_MODIFIED, PropertyInfo(Variant::STRING, "paths")));
+
+	ADD_SIGNAL(MethodInfo(SIGNAL_CLOSE_BUTTON_CLICKED));
 }
