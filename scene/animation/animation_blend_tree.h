@@ -104,7 +104,7 @@ class AnimationNodeAnimationPose : public AnimationNodeAnimation {
 public:
 
 	virtual String get_caption() const override;
-	virtual double _process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only = false) override;
+	virtual NodeTimeInfo _process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only = false) override;
 };
 
 VARIANT_ENUM_CAST(AnimationNodeAnimation::PlayMode)
@@ -345,7 +345,7 @@ class AnimationNodeTimeSeekFake : public AnimationNodeTimeSeek {
 public:
 	virtual String get_caption() const override;
 
-	double _process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only = false) override;
+	NodeTimeInfo _process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only = false) override;
 };
 
 class AnimationNodeTransition : public AnimationNodeSync {

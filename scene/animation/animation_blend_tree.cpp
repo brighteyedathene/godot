@@ -368,9 +368,7 @@ String AnimationNodeAnimationPose::get_caption() const {
 	return "AnimationPose";
 }
 
-double AnimationNodeAnimationPose::_process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only) {
-	double cur_time = get_parameter(time);
-
+AnimationNode::NodeTimeInfo AnimationNodeAnimationPose::_process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only) {
 	if (!process_state->tree->has_animation(animation)) {
 		AnimationNodeBlendTree *tree = Object::cast_to<AnimationNodeBlendTree>(node_state.parent);
 		if (tree) {
@@ -381,108 +379,52 @@ double AnimationNodeAnimationPose::_process(const AnimationMixer::PlaybackInfo p
 			make_invalid(vformat(RTR("Animation not found: '%s'"), animation));
 		}
 
-		return 0;
+		return NodeTimeInfo();
 	}
 
 	Ref<Animation> anim = process_state->tree->get_animation(animation);
 	double anim_size = (double)anim->get_length();
-	double step = 0.0;
-	double prev_time = cur_time;
+
+	NodeTimeInfo cur_nti = get_node_time_info();
+	double cur_len = cur_nti.length;
+	double cur_time = p_playback_info.time;
+	double cur_delta = p_playback_info.delta;
+
+	Animation::LoopMode cur_loop_mode = cur_nti.loop_mode;
+	double prev_time = cur_nti.position;
+
 	Animation::LoopedFlag looped_flag = Animation::LOOPED_FLAG_NONE;
 	bool node_backward = play_mode == PLAY_MODE_BACKWARD;
 
-	double p_time = p_playback_info.time;
 	bool p_seek = p_playback_info.seeked;
 	bool p_is_external_seeking = p_playback_info.is_external_seeking;
 
-	if (p_playback_info.seeked) {
-		step = p_time - cur_time;
-		cur_time = p_time;
-	} else {
-		p_time *= backward ? -1.0 : 1.0;
-		cur_time = cur_time + p_time;
-		step = p_time;
-	}
+	bool is_just_looped = false;
 
-	bool is_looping = false;
-	if (anim->get_loop_mode() == Animation::LOOP_PINGPONG) {
-		if (!Math::is_zero_approx(anim_size)) {
-			if (prev_time >= 0 && cur_time < 0) {
-				backward = !backward;
-				looped_flag = node_backward ? Animation::LOOPED_FLAG_END : Animation::LOOPED_FLAG_START;
-			}
-			if (prev_time <= anim_size && cur_time > anim_size) {
-				backward = !backward;
-				looped_flag = node_backward ? Animation::LOOPED_FLAG_START : Animation::LOOPED_FLAG_END;
-			}
-			cur_time = Math::pingpong(cur_time, anim_size);
-		}
-		is_looping = true;
-	} else if (anim->get_loop_mode() == Animation::LOOP_LINEAR) {
-		if (!Math::is_zero_approx(anim_size)) {
-			if (prev_time >= 0 && cur_time < 0) {
-				looped_flag = node_backward ? Animation::LOOPED_FLAG_END : Animation::LOOPED_FLAG_START;
-			}
-			if (prev_time <= anim_size && cur_time > anim_size) {
-				looped_flag = node_backward ? Animation::LOOPED_FLAG_START : Animation::LOOPED_FLAG_END;
-			}
-			cur_time = Math::fposmod(cur_time, anim_size);
-		}
-		backward = false;
-		is_looping = true;
-	} else {
-		if (cur_time < 0) {
-			step += cur_time;
-			cur_time = 0;
-		} else if (cur_time > anim_size) {
-			step += anim_size - cur_time;
-			cur_time = anim_size;
-		}
-		backward = false;
 
-		// If ended, don't progress animation. So set delta to 0.
-		if (p_time > 0) {
-			if (play_mode == PLAY_MODE_FORWARD) {
-				if (prev_time >= anim_size) {
-					step = 0;
-				}
-			} else {
-				if (prev_time <= 0) {
-					step = 0;
-				}
-			}
-		}
-
-		// Emit start & finish signal. Internally, the detections are the same for backward.
-		// We should use call_deferred since the track keys are still being processed.
-		if (process_state->tree && !p_test_only) {
-			// AnimationTree uses seek to 0 "internally" to process the first key of the animation, which is used as the start detection.
-			if (p_seek && !p_is_external_seeking && cur_time == 0) {
-				process_state->tree->call_deferred(SNAME("emit_signal"), "animation_started", animation);
-			}
-			// Finished.
-			if (prev_time < anim_size && cur_time >= anim_size) {
-				process_state->tree->call_deferred(SNAME("emit_signal"), "animation_finished", animation);
-			}
-		}
-	}
+	// 2. For return, store "AnimationNode" time info here, not "Animation" time info as below.
+	NodeTimeInfo nti;
+	nti.length = cur_len;
+	nti.position = cur_time;
+	nti.delta = 0.0;
+	nti.loop_mode = cur_loop_mode;
+	nti.is_just_looped = is_just_looped;
 
 	if (!p_test_only) {
 		AnimationMixer::PlaybackInfo pi = p_playback_info;
 		if (play_mode == PLAY_MODE_FORWARD) {
 			pi.time = cur_time;
-			pi.delta = 0 /*step*/;
+			pi.delta = 0 /*cur_delta*/;
 		} else {
 			pi.time = anim_size - cur_time;
-			pi.delta = 0 /*-step*/;
+			pi.delta = 0 /*-cur_delta*/;
 		}
 		pi.weight = 1.0;
 		pi.looped_flag = looped_flag;
 		blend_animation(animation, pi);
 	}
-	set_parameter(time, cur_time);
 
-	return is_looping ? HUGE_LENGTH : anim_size - cur_time;
+	return nti;
 }
 
 ////////////////////////////////////////////////////////
@@ -1153,18 +1095,18 @@ String AnimationNodeTimeSeekFake::get_caption() const {
 	return "TimeSeekFake";
 }
 
-double AnimationNodeTimeSeekFake::_process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only) {
+AnimationNode::NodeTimeInfo AnimationNodeTimeSeekFake::_process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only) {
 	/* Basically identical except I always set p_seek to false. Hopefully this will let me skip event notifies
 	*/
 	double cur_seek_pos = get_parameter(seek_pos_request);
 
 	AnimationMixer::PlaybackInfo pi = p_playback_info;
 	pi.weight = 1.0;
-	pi.seeked = false;
+	pi.seeked = true;
 	if (cur_seek_pos >= 0) {
 		pi.time = cur_seek_pos;
 		pi.is_external_seeking = true;
-		set_parameter(seek_pos_request, -1.0); // Reset.
+		//set_parameter(seek_pos_request, -1.0); // Reset.
 	}
 
 	return blend_input(0, pi, FILTER_IGNORE, true, p_test_only);
