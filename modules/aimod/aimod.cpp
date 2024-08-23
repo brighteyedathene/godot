@@ -114,6 +114,10 @@ TypedArray<Node> VisibilitySystem::calculate_vision(const Ref<VisionQueryParamet
 	// Don't forget to free the shape!
 	PhysicsServer3D::get_singleton()->free(sphere_rid);
 
+	// Declare these in advance, outside the loop? I heard this is faster...
+	PhysicsDirectSpaceState3D::RayParameters ray_params;
+	PhysicsDirectSpaceState3D::RayResult ray_result;
+
 	//for (const PhysicsDirectSpaceState3D::ShapeResult& result : results) {
 	for (int i = 0; i < collision_count; i++) {
 		const PhysicsDirectSpaceState3D::ShapeResult &result = results[i];
@@ -142,14 +146,13 @@ TypedArray<Node> VisibilitySystem::calculate_vision(const Ref<VisionQueryParamet
 			}
 
 			// shoot expensive rays...
-			PhysicsDirectSpaceState3D::RayParameters ray_params;
+			
 			ray_params.from = p_query->get_eye_position();
 			ray_params.to = ray_target;
 			ray_params.collision_mask = p_query->get_occlusion_collision_mask();
 			ray_params.collide_with_areas = true; // for smoke....
 			// skipping ignore querier and object, because they shouldn't be on the same collision channel as the ray.
 
-			PhysicsDirectSpaceState3D::RayResult ray_result;
 			obstructed &= space->intersect_ray(ray_params, ray_result);
 
 			if (obstructed == false) {

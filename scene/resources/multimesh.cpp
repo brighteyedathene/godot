@@ -306,7 +306,7 @@ bool MultiMesh::is_using_custom_data() const {
 }
 
 void MultiMesh::set_transform_format(TransformFormat p_transform_format) {
-	ERR_FAIL_COND(instance_count > 0);
+	ERR_FAIL_COND(instance_count > 0 && p_transform_format != transform_format);
 	transform_format = p_transform_format;
 }
 
