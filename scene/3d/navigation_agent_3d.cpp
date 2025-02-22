@@ -53,6 +53,9 @@ void NavigationAgent3D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_path_height_offset", "path_height_offset"), &NavigationAgent3D::set_path_height_offset);
 	ClassDB::bind_method(D_METHOD("get_path_height_offset"), &NavigationAgent3D::get_path_height_offset);
+	
+	ClassDB::bind_method(D_METHOD("set_path_height_tolerance", "path_height_tolerance"), &NavigationAgent3D::set_path_height_tolerance);
+	ClassDB::bind_method(D_METHOD("get_path_height_tolerance"), &NavigationAgent3D::get_path_height_tolerance);
 
 	ClassDB::bind_method(D_METHOD("set_use_3d_avoidance", "enabled"), &NavigationAgent3D::set_use_3d_avoidance);
 	ClassDB::bind_method(D_METHOD("get_use_3d_avoidance"), &NavigationAgent3D::get_use_3d_avoidance);
@@ -141,6 +144,7 @@ void NavigationAgent3D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "path_desired_distance", PROPERTY_HINT_RANGE, "0.1,100,0.01,or_greater,suffix:m"), "set_path_desired_distance", "get_path_desired_distance");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "target_desired_distance", PROPERTY_HINT_RANGE, "0.1,100,0.01,or_greater,suffix:m"), "set_target_desired_distance", "get_target_desired_distance");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "path_height_offset", PROPERTY_HINT_RANGE, "-100.0,100,0.01,or_greater,suffix:m"), "set_path_height_offset", "get_path_height_offset");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "path_height_tolerance", PROPERTY_HINT_RANGE, "0.1,100,0.01,or_greater,suffix:m"), "set_path_height_tolerance", "get_path_height_tolerance");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "path_max_distance", PROPERTY_HINT_RANGE, "0.01,100,0.1,or_greater,suffix:m"), "set_path_max_distance", "get_path_max_distance");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "navigation_layers", PROPERTY_HINT_LAYERS_3D_NAVIGATION), "set_navigation_layers", "get_navigation_layers");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "pathfinding_algorithm", PROPERTY_HINT_ENUM, "AStar"), "set_pathfinding_algorithm", "get_pathfinding_algorithm");
@@ -557,6 +561,10 @@ void NavigationAgent3D::set_path_height_offset(real_t p_path_height_offset) {
 	path_height_offset = p_path_height_offset;
 }
 
+void NavigationAgent3D::set_path_height_tolerance(real_t p_path_height_tolerance) {
+	path_height_tolerance = p_path_height_tolerance;
+}
+
 void NavigationAgent3D::set_use_3d_avoidance(bool p_use_3d_avoidance) {
 	use_3d_avoidance = p_use_3d_avoidance;
 	NavigationServer3D::get_singleton()->agent_set_use_3d_avoidance(agent, use_3d_avoidance);
@@ -849,6 +857,16 @@ void NavigationAgent3D::_move_to_next_waypoint() {
 bool NavigationAgent3D::_is_within_waypoint_distance(const Vector3 &p_origin) const {
 	const Vector<Vector3> &navigation_path = navigation_result->get_path();
 	Vector3 waypoint = navigation_path[navigation_path_index] - Vector3(0, path_height_offset, 0);
+	// be more lenient with height differences than horizontal differences
+	// I check height difference separately
+	const real_t height_tolerance = get_path_height_tolerance();
+	real_t height_diff = waypoint.y - p_origin.y;
+	if (abs(height_diff) > height_tolerance) {
+		return false;
+	}
+	// Now that the height is ok, I ignore waypoint height by moving it up to agent's level.
+	// So I MUST have some height tolerance on everyone or they won't be able to follow paths
+	waypoint.y = p_origin.y;
 	return p_origin.distance_to(waypoint) < path_desired_distance;
 }
 

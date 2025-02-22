@@ -60,6 +60,7 @@ class NavigationAgent3D : public Node {
 	real_t height = 1.0;
 	real_t radius = 0.5;
 	real_t path_height_offset = 0.0;
+	real_t path_height_tolerance = 0.5;
 	real_t neighbor_distance = 50.0;
 	int max_neighbors = 10;
 	real_t time_horizon_agents = 1.0;
@@ -174,6 +175,9 @@ public:
 
 	void set_path_height_offset(real_t p_path_height_offset);
 	real_t get_path_height_offset() const { return path_height_offset; }
+	
+	void set_path_height_tolerance(real_t p_path_tolerance);
+	real_t get_path_height_tolerance() const { return path_height_tolerance; }
 
 	void set_use_3d_avoidance(bool p_use_3d_avoidance);
 	bool get_use_3d_avoidance() const { return use_3d_avoidance; }
