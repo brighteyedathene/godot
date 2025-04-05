@@ -262,6 +262,8 @@ public:
 	void set_debug_path_custom_point_size(float p_point_size);
 	float get_debug_path_custom_point_size() const;
 
+	bool is_location_reached(const Vector3 &p_origin, const Vector3 &p_location, float desired_distance) const;
+
 private:
 	bool _is_target_reachable() const;
 	Vector3 _get_final_position() const;

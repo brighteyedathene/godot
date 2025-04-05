@@ -139,6 +139,8 @@ void NavigationAgent3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_avoidance_priority", "priority"), &NavigationAgent3D::set_avoidance_priority);
 	ClassDB::bind_method(D_METHOD("get_avoidance_priority"), &NavigationAgent3D::get_avoidance_priority);
 
+	ClassDB::bind_method(D_METHOD("is_location_reached", "origin", "location", "desired_distance"), &NavigationAgent3D::is_location_reached);
+
 	ADD_GROUP("Pathfinding", "");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "target_position", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR), "set_target_position", "get_target_position");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "path_desired_distance", PROPERTY_HINT_RANGE, "0.1,100,0.01,or_greater,suffix:m"), "set_path_desired_distance", "get_path_desired_distance");
@@ -854,24 +856,34 @@ void NavigationAgent3D::_move_to_next_waypoint() {
 	navigation_path_index += 1;
 }
 
-bool NavigationAgent3D::_is_within_waypoint_distance(const Vector3 &p_origin) const {
-	const Vector<Vector3> &navigation_path = navigation_result->get_path();
-	Vector3 waypoint = navigation_path[navigation_path_index] - Vector3(0, path_height_offset, 0);
+bool NavigationAgent3D::is_location_reached(const Vector3& p_origin, const Vector3& p_location, float desired_distance) const {
+	// I'm going to change the location's y, so I'm un-consting
+	Vector3 location = p_location;
 	// be more lenient with height differences than horizontal differences
 	// I check height difference separately
-	const real_t height_tolerance = get_path_height_tolerance();
-	real_t height_diff = waypoint.y - p_origin.y;
+	const real_t height_tolerance = MAX(desired_distance, get_path_height_tolerance());
+	real_t height_diff = location.y - p_origin.y;
 	if (abs(height_diff) > height_tolerance) {
 		return false;
 	}
 	// Now that the height is ok, I ignore waypoint height by moving it up to agent's level.
 	// So I MUST have some height tolerance on everyone or they won't be able to follow paths
-	waypoint.y = p_origin.y;
-	return p_origin.distance_to(waypoint) < path_desired_distance;
+	location.y = p_origin.y;
+	return p_origin.distance_squared_to(location) < desired_distance * desired_distance;
+}
+
+bool NavigationAgent3D::_is_within_waypoint_distance(const Vector3 &p_origin) const {
+	const Vector<Vector3> &navigation_path = navigation_result->get_path();
+	Vector3 waypoint = navigation_path[navigation_path_index] - Vector3(0, path_height_offset, 0);
+
+	return is_location_reached(p_origin, waypoint, path_desired_distance);
 }
 
 bool NavigationAgent3D::_is_within_target_distance(const Vector3 &p_origin) const {
-	return p_origin.distance_to(target_position) < target_desired_distance;
+	return is_location_reached(p_origin, target_position, target_desired_distance);
+
+	// old version without height tolerance
+	//return p_origin.distance_to(target_position) < target_desired_distance;
 }
 
 void NavigationAgent3D::_trigger_waypoint_reached() {
