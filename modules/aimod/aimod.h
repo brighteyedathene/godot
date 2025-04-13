@@ -12,7 +12,7 @@
 template <typename T>
 class TypedArray;
 
-using namespace godot;
+//using namespace godot;
 
 
 class VisionQueryParameters : public RefCounted {

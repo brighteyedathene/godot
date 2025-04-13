@@ -28,8 +28,7 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#ifndef TEST_INSTANCE_PLACEHOLDER_H
-#define TEST_INSTANCE_PLACEHOLDER_H
+#pragma once
 
 #include "scene/main/instance_placeholder.h"
 #include "scene/resources/packed_scene.h"
@@ -333,6 +332,7 @@ TEST_CASE("[SceneTree][InstancePlaceholder] Instantiate from placeholder with ov
 	}
 }
 
+#ifdef TOOLS_ENABLED
 TEST_CASE("[SceneTree][InstancePlaceholder] Instance a PackedScene containing an InstancePlaceholder with no overrides") {
 	GDREGISTER_CLASS(_TestInstancePlaceholderNode);
 
@@ -502,10 +502,11 @@ TEST_CASE("[SceneTree][InstancePlaceholder] Instance a PackedScene containing an
 	REQUIRE(final_node->get_reference_property().identity_compare(instanced_main_node->get_child(1, true)));
 	Array final_array = final_node->get_reference_array_property();
 	REQUIRE(final_array.size() == 3);
-	Array wanted_node_array;
-	wanted_node_array.push_back(instanced_main_node->get_child(2, true)); // ExternalArrayMember
-	wanted_node_array.push_back(final_node->get_child(1, true)); // ArrayRef1
-	wanted_node_array.push_back(final_node->get_child(2, true)); // ArrayRef2
+	Array wanted_node_array = {
+		instanced_main_node->get_child(2, true), // ExternalArrayMember
+		final_node->get_child(1, true), // ArrayRef1
+		final_node->get_child(2, true) // ArrayRef2
+	};
 
 	// Iterate over all nodes, since the ordering is not guaranteed.
 	for (int i = 0; i < wanted_node_array.size(); i++) {
@@ -526,7 +527,6 @@ TEST_CASE("[SceneTree][InstancePlaceholder] Instance a PackedScene containing an
 	DirAccess::remove_file_or_error(internal_path);
 	DirAccess::remove_file_or_error(main_path);
 }
+#endif // TOOLS_ENABLED
 
 } //namespace TestInstancePlaceholder
-
-#endif // TEST_INSTANCE_PLACEHOLDER_H

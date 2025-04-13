@@ -366,7 +366,7 @@ void SkeletonIK3D::_bind_methods() {
 #endif
 }
 
-void SkeletonIK3D::_process_modification() {
+void SkeletonIK3D::_process_modification(double p_delta) {
 	if (!internal_active) {
 		return;
 	}
@@ -485,7 +485,7 @@ bool SkeletonIK3D::is_running() {
 void SkeletonIK3D::start(bool p_one_time) {
 	if (p_one_time) {
 		internal_active = true;
-		SkeletonModifier3D::process_modification();
+		SkeletonModifier3D::process_modification(0);
 		internal_active = false;
 	} else {
 		internal_active = true;
@@ -503,7 +503,11 @@ Transform3D SkeletonIK3D::_get_target_transform() {
 
 	Node3D *target_node_override = cast_to<Node3D>(target_node_override_ref.get_validated_object());
 	if (target_node_override && target_node_override->is_inside_tree()) {
-		return target_node_override->get_global_transform();
+		// Make sure to use the interpolated transform as target.
+		// When physics interpolation is off this will pass through to get_global_transform().
+		// When using interpolation, ensure that the target matches the interpolated visual position
+		// of the target when updating the IK each frame.
+		return target_node_override->get_global_transform_interpolated();
 	} else {
 		return target;
 	}

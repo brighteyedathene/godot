@@ -520,7 +520,7 @@ Error SkinTool::_determine_skeleton_roots(
 
 	skeleton->roots = roots;
 
-	if (roots.size() == 0) {
+	if (roots.is_empty()) {
 		return FAILED;
 	} else if (roots.size() == 1) {
 		return OK;
@@ -601,6 +601,11 @@ Error SkinTool::_create_skeletons(
 			skeleton->set_bone_pose_position(bone_index, node->transform.origin);
 			skeleton->set_bone_pose_rotation(bone_index, node->transform.basis.get_rotation_quaternion());
 			skeleton->set_bone_pose_scale(bone_index, node->transform.basis.get_scale());
+
+			// Store bone-level GLTF extras in skeleton per bone meta.
+			if (node->has_meta("extras")) {
+				skeleton->set_bone_meta(bone_index, "extras", node->get_meta("extras"));
+			}
 
 			if (node->parent >= 0 && nodes[node->parent]->skeleton == skel_i) {
 				const int bone_parent = skeleton->find_bone(nodes[node->parent]->get_name());

@@ -138,6 +138,7 @@ void RenderSceneBuffersGLES3::configure(const RenderSceneBuffersConfiguration *p
 	scaling_3d_mode = p_config->get_scaling_3d_mode();
 	//fsr_sharpness = p_config->get_fsr_sharpness();
 	//texture_mipmap_bias = p_config->get_texture_mipmap_bias();
+	//anisotropic_filtering_level = p_config->get_anisotropic_filtering_level();
 	render_target = p_config->get_render_target();
 	msaa3d.mode = p_config->get_msaa_3d();
 	//screen_space_aa = p_config->get_screen_space_aa();
@@ -194,7 +195,7 @@ void RenderSceneBuffersGLES3::_check_render_buffers() {
 
 	ERR_FAIL_COND(view_count == 0);
 
-	bool use_internal_buffer = scaling_3d_mode != RS::VIEWPORT_SCALING_3D_MODE_OFF || needs_internal_buffers;
+	bool use_internal_buffer = scaling_3d_mode != RS::VIEWPORT_SCALING_3D_MODE_OFF || apply_color_adjustments_in_post;
 	uint32_t depth_format_size = 3;
 	bool use_multiview = view_count > 1;
 
@@ -558,8 +559,8 @@ void RenderSceneBuffersGLES3::_clear_back_buffers() {
 	}
 }
 
-void RenderSceneBuffersGLES3::ensure_internal_buffers() {
-	needs_internal_buffers = true;
+void RenderSceneBuffersGLES3::set_apply_color_adjustments_in_post(bool p_apply_in_post) {
+	apply_color_adjustments_in_post = p_apply_in_post;
 }
 
 void RenderSceneBuffersGLES3::check_glow_buffers() {

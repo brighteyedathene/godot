@@ -177,7 +177,8 @@ void NCharacter3D::_move_and_slide_grounded(double p_delta, bool p_was_on_floor)
 		stepping_up = false;
 		return;
 	}
-	_set_collision_direction(down_result, CollisionState());
+	CollisionState result_state;
+	_set_collision_direction(down_result, result_state);
 
 	// Cache step move results
 	StateCache step_move_cache;

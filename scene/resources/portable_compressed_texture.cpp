@@ -35,7 +35,7 @@
 #include "scene/resources/bit_map.h"
 
 void PortableCompressedTexture2D::_set_data(const Vector<uint8_t> &p_data) {
-	if (p_data.size() == 0) {
+	if (p_data.is_empty()) {
 		return; //nothing to do
 	}
 
@@ -89,7 +89,7 @@ void PortableCompressedTexture2D::_set_data(const Vector<uint8_t> &p_data) {
 				data_size -= mipsize;
 			}
 
-			image = Ref<Image>(memnew(Image(size.width, size.height, mipmaps, format, image_data)));
+			image.instantiate(size.width, size.height, mipmaps, format, image_data);
 
 		} break;
 		case COMPRESSION_MODE_BASIS_UNIVERSAL: {
@@ -100,7 +100,7 @@ void PortableCompressedTexture2D::_set_data(const Vector<uint8_t> &p_data) {
 		case COMPRESSION_MODE_S3TC:
 		case COMPRESSION_MODE_ETC2:
 		case COMPRESSION_MODE_BPTC: {
-			image = Ref<Image>(memnew(Image(size.width, size.height, mipmaps, format, p_data.slice(20))));
+			image.instantiate(size.width, size.height, mipmaps, format, p_data.slice(20));
 		} break;
 	}
 	ERR_FAIL_COND(image.is_null());
@@ -171,6 +171,7 @@ void PortableCompressedTexture2D::create_from_image(const Ref<Image> &p_image, C
 			}
 		} break;
 		case COMPRESSION_MODE_BASIS_UNIVERSAL: {
+			ERR_FAIL_COND(p_image->is_compressed());
 			encode_uint16(DATA_FORMAT_BASIS_UNIVERSAL, buffer.ptrw() + 2);
 			Image::UsedChannels uc = p_image->detect_used_channels(p_normal_map ? Image::COMPRESS_SOURCE_NORMAL : Image::COMPRESS_SOURCE_GENERIC);
 			Vector<uint8_t> budata = Image::basis_universal_packer(p_image, uc);
@@ -180,6 +181,7 @@ void PortableCompressedTexture2D::create_from_image(const Ref<Image> &p_image, C
 		case COMPRESSION_MODE_S3TC:
 		case COMPRESSION_MODE_ETC2:
 		case COMPRESSION_MODE_BPTC: {
+			ERR_FAIL_COND(p_image->is_compressed());
 			encode_uint16(DATA_FORMAT_IMAGE, buffer.ptrw() + 2);
 			Ref<Image> copy = p_image->duplicate();
 			switch (p_compression_mode) {
@@ -195,7 +197,7 @@ void PortableCompressedTexture2D::create_from_image(const Ref<Image> &p_image, C
 				default: {
 				};
 			}
-
+			encode_uint32(copy->get_format(), buffer.ptrw() + 4);
 			buffer.append_array(copy->get_data());
 
 		} break;
@@ -258,7 +260,7 @@ void PortableCompressedTexture2D::draw_rect_region(RID p_canvas_item, const Rect
 }
 
 bool PortableCompressedTexture2D::is_pixel_opaque(int p_x, int p_y) const {
-	if (!alpha_cache.is_valid()) {
+	if (alpha_cache.is_null()) {
 		Ref<Image> img = get_image();
 		if (img.is_valid()) {
 			if (img->is_compressed()) { //must decompress, if compressed
@@ -345,7 +347,7 @@ void PortableCompressedTexture2D::_bind_methods() {
 	ClassDB::bind_static_method("PortableCompressedTexture2D", D_METHOD("set_keep_all_compressed_buffers", "keep"), &PortableCompressedTexture2D::set_keep_all_compressed_buffers);
 	ClassDB::bind_static_method("PortableCompressedTexture2D", D_METHOD("is_keeping_all_compressed_buffers"), &PortableCompressedTexture2D::is_keeping_all_compressed_buffers);
 
-	ADD_PROPERTY(PropertyInfo(Variant::PACKED_BYTE_ARRAY, "_data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR), "_set_data", "_get_data");
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_BYTE_ARRAY, "_data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR | PROPERTY_USAGE_INTERNAL), "_set_data", "_get_data");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "size_override", PROPERTY_HINT_NONE, "suffix:px"), "set_size_override", "get_size_override");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "keep_compressed_buffer"), "set_keep_compressed_buffer", "is_keeping_compressed_buffer");
 

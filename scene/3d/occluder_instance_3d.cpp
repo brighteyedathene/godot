@@ -129,9 +129,6 @@ void Occluder3D::_notification(int p_what) {
 	}
 }
 
-void Occluder3D::_bind_methods() {
-}
-
 Occluder3D::Occluder3D() {
 	occluder = RS::get_singleton()->occluder_create();
 }
@@ -524,7 +521,7 @@ void OccluderInstance3D::_bake_surface(const Transform3D &p_transform, Array p_s
 	PackedVector3Array vertices = p_surface_arrays[Mesh::ARRAY_VERTEX];
 	PackedInt32Array indices = p_surface_arrays[Mesh::ARRAY_INDEX];
 
-	if (vertices.size() == 0 || indices.size() == 0) {
+	if (vertices.is_empty() || indices.is_empty()) {
 		return;
 	}
 
@@ -694,7 +691,7 @@ OccluderInstance3D::BakeError OccluderInstance3D::bake_scene(Node *p_from_node, 
 }
 
 PackedStringArray OccluderInstance3D::get_configuration_warnings() const {
-	PackedStringArray warnings = Node::get_configuration_warnings();
+	PackedStringArray warnings = VisualInstance3D::get_configuration_warnings();
 
 	if (!bool(GLOBAL_GET("rendering/occlusion_culling/use_occlusion_culling"))) {
 		warnings.push_back(RTR("Occlusion culling is disabled in the Project Settings, which means occlusion culling won't be performed in the root viewport.\nTo resolve this, open the Project Settings and enable Rendering > Occlusion Culling > Use Occlusion Culling."));

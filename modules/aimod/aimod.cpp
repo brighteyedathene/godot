@@ -8,7 +8,7 @@
 
 #include "scene/3d/n_character_3d.h" // need this for vision targets
 
-using namespace godot;
+//using namespace godot;
 
 
 VisibilitySystem *VisibilitySystem::singleton = nullptr;

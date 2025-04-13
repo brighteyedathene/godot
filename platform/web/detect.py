@@ -13,7 +13,8 @@ from emscripten_helpers import (
 )
 from SCons.Util import WhereIs
 
-from methods import get_compiler_version, print_error, print_warning
+from methods import get_compiler_version, print_error, print_info, print_warning
+from platform_methods import validate_arch
 
 if TYPE_CHECKING:
     from SCons.Script.SConscript import SConsEnvironment
@@ -25,6 +26,11 @@ def get_name():
 
 def can_build():
     return WhereIs("emcc") is not None
+
+
+def get_tools(env: "SConsEnvironment"):
+    # Use generic POSIX build toolchain for Emscripten.
+    return ["cc", "c++", "ar", "link", "textfile", "zip"]
 
 
 def get_opts():
@@ -78,19 +84,25 @@ def get_flags():
         # -Os reduces file size by around 5 MiB over -O3. -Oz only saves about
         # 100 KiB over -Os, which does not justify the negative impact on
         # run-time performance.
+        # Note that this overrides the "auto" behavior for target/dev_build.
         "optimize": "size",
     }
 
 
+def library_emitter(target, source, env):
+    # Make every source file dependent on the compiler version.
+    # This makes sure that when emscripten is updated, that the cached files
+    # aren't used and are recompiled instead.
+    env.Depends(source, env.Value(get_compiler_version(env)))
+    return target, source
+
+
 def configure(env: "SConsEnvironment"):
+    env.Append(LIBEMITTER=[library_emitter])
+
     # Validate arch.
     supported_arches = ["wasm32"]
-    if env["arch"] not in supported_arches:
-        print_error(
-            'Unsupported CPU architecture "%s" for Web. Supported architectures are: %s.'
-            % (env["arch"], ", ".join(supported_arches))
-        )
-        sys.exit(255)
+    validate_arch(env["arch"], get_name(), supported_arches)
 
     try:
         env["initial_memory"] = int(env["initial_memory"])
@@ -110,7 +122,7 @@ def configure(env: "SConsEnvironment"):
         env.Append(LINKFLAGS=["-sASSERTIONS=1"])
 
     if env.editor_build and env["initial_memory"] < 64:
-        print("Note: Forcing `initial_memory=64` as it is required for the web editor.")
+        print_info("Forcing `initial_memory=64` as it is required for the web editor.")
         env["initial_memory"] = 64
 
     env.Append(LINKFLAGS=["-sINITIAL_MEMORY=%sMB" % env["initial_memory"]])
@@ -120,8 +132,8 @@ def configure(env: "SConsEnvironment"):
 
     # LTO
 
-    if env["lto"] == "auto":  # Full LTO for production.
-        env["lto"] = "full"
+    if env["lto"] == "auto":  # Enable LTO for production.
+        env["lto"] = "thin"
 
     if env["lto"] != "none":
         if env["lto"] == "thin":
@@ -169,9 +181,6 @@ def configure(env: "SConsEnvironment"):
     # Add method for creating the final zip file
     env.AddMethod(create_template_zip, "CreateTemplateZip")
 
-    # Closure compiler extern and support for ecmascript specs (const, let, etc).
-    env["ENV"]["EMCC_CLOSURE_ARGS"] = "--language_in ECMASCRIPT_2021"
-
     env["CC"] = "emcc"
     env["CXX"] = "em++"
 
@@ -198,8 +207,13 @@ def configure(env: "SConsEnvironment"):
     cc_version = get_compiler_version(env)
     cc_semver = (cc_version["major"], cc_version["minor"], cc_version["patch"])
 
+    # Minimum emscripten requirements.
+    if cc_semver < (3, 1, 62):
+        print_error("The minimum emscripten version to build Godot is 3.1.62, detected: %s.%s.%s" % cc_semver)
+        sys.exit(255)
+
     env.Prepend(CPPPATH=["#platform/web"])
-    env.Append(CPPDEFINES=["WEB_ENABLED", "UNIX_ENABLED"])
+    env.Append(CPPDEFINES=["WEB_ENABLED", "UNIX_ENABLED", "UNIX_SOCKET_UNAVAILABLE"])
 
     if env["opengl3"]:
         env.AppendUnique(CPPDEFINES=["GLES3_ENABLED"])
@@ -207,17 +221,14 @@ def configure(env: "SConsEnvironment"):
         env.Append(LINKFLAGS=["-sMAX_WEBGL_VERSION=2"])
         # Allow use to take control of swapping WebGL buffers.
         env.Append(LINKFLAGS=["-sOFFSCREEN_FRAMEBUFFER=1"])
-        # Breaking change since emscripten 3.1.51
-        # https://github.com/emscripten-core/emscripten/blob/main/ChangeLog.md#3151---121323
-        if cc_semver >= (3, 1, 51):
-            # Enables the use of *glGetProcAddress()
-            env.Append(LINKFLAGS=["-sGL_ENABLE_GET_PROC_ADDRESS=1"])
+        # Disables the use of *glGetProcAddress() which is inefficient.
+        # See https://emscripten.org/docs/tools_reference/settings_reference.html#gl-enable-get-proc-address
+        env.Append(LINKFLAGS=["-sGL_ENABLE_GET_PROC_ADDRESS=0"])
 
     if env["javascript_eval"]:
         env.Append(CPPDEFINES=["JAVASCRIPT_EVAL_ENABLED"])
 
-    stack_size_opt = "STACK_SIZE" if cc_semver >= (3, 1, 25) else "TOTAL_STACK"
-    env.Append(LINKFLAGS=["-s%s=%sKB" % (stack_size_opt, env["stack_size"])])
+    env.Append(LINKFLAGS=["-s%s=%sKB" % ("STACK_SIZE", env["stack_size"])])
 
     if env["threads"]:
         # Thread support (via SharedArrayBuffer).
@@ -227,26 +238,23 @@ def configure(env: "SConsEnvironment"):
         env.Append(LINKFLAGS=["-sDEFAULT_PTHREAD_STACK_SIZE=%sKB" % env["default_pthread_stack_size"]])
         env.Append(LINKFLAGS=["-sPTHREAD_POOL_SIZE=8"])
         env.Append(LINKFLAGS=["-sWASM_MEM_MAX=2048MB"])
+        if not env["dlink_enabled"]:
+            # Workaround https://github.com/emscripten-core/emscripten/issues/21844#issuecomment-2116936414.
+            # Not needed (and potentially dangerous) when dlink_enabled=yes, since we set EXPORT_ALL=1 in that case.
+            env.Append(LINKFLAGS=["-sEXPORTED_FUNCTIONS=['__emscripten_thread_crashed','_main']"])
+
     elif env["proxy_to_pthread"]:
         print_warning('"threads=no" support requires "proxy_to_pthread=no", disabling proxy to pthread.')
         env["proxy_to_pthread"] = False
 
     if env["lto"] != "none":
-        # Workaround https://github.com/emscripten-core/emscripten/issues/19781.
-        if cc_semver >= (3, 1, 42) and cc_semver < (3, 1, 46):
-            env.Append(LINKFLAGS=["-Wl,-u,scalbnf"])
         # Workaround https://github.com/emscripten-core/emscripten/issues/16836.
-        if cc_semver >= (3, 1, 47):
-            env.Append(LINKFLAGS=["-Wl,-u,_emscripten_run_callback_on_thread"])
+        env.Append(LINKFLAGS=["-Wl,-u,_emscripten_run_callback_on_thread"])
 
     if env["dlink_enabled"]:
         if env["proxy_to_pthread"]:
             print_warning("GDExtension support requires proxy_to_pthread=no, disabling proxy to pthread.")
             env["proxy_to_pthread"] = False
-
-        if cc_semver < (3, 1, 14):
-            print_error("GDExtension support requires emscripten >= 3.1.14, detected: %s.%s.%s" % cc_semver)
-            sys.exit(255)
 
         env.Append(CCFLAGS=["-sSIDE_MODULE=2"])
         env.Append(LINKFLAGS=["-sSIDE_MODULE=2"])
@@ -254,8 +262,7 @@ def configure(env: "SConsEnvironment"):
         env.Append(LINKFLAGS=["-fvisibility=hidden"])
         env.extra_suffix = ".dlink" + env.extra_suffix
 
-    # WASM_BIGINT is needed since emscripten ≥ 3.1.41
-    needs_wasm_bigint = cc_semver >= (3, 1, 41)
+    env.Append(LINKFLAGS=["-sWASM_BIGINT"])
 
     # Run the main application in a web worker
     if env["proxy_to_pthread"]:
@@ -264,11 +271,6 @@ def configure(env: "SConsEnvironment"):
         env.Append(LINKFLAGS=["-sEXPORTED_RUNTIME_METHODS=['_emscripten_proxy_main']"])
         # https://github.com/emscripten-core/emscripten/issues/18034#issuecomment-1277561925
         env.Append(LINKFLAGS=["-sTEXTDECODER=0"])
-        # BigInt support to pass object pointers between contexts
-        needs_wasm_bigint = True
-
-    if needs_wasm_bigint:
-        env.Append(LINKFLAGS=["-sWASM_BIGINT"])
 
     # Reduce code size by generating less support code (e.g. skip NodeJS support).
     env.Append(LINKFLAGS=["-sENVIRONMENT=web,worker"])

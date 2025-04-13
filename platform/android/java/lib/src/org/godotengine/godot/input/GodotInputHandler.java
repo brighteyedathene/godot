@@ -32,10 +32,15 @@ package org.godotengine.godot.input;
 
 import static org.godotengine.godot.utils.GLUtils.DEBUG;
 
+import org.godotengine.godot.Godot;
 import org.godotengine.godot.GodotLib;
 import org.godotengine.godot.GodotRenderView;
 
 import android.content.Context;
+import android.content.res.Configuration;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
 import android.hardware.input.InputManager;
 import android.os.Build;
 import android.util.Log;
@@ -46,15 +51,20 @@ import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
+import android.view.Surface;
+import android.view.WindowManager;
+
+import androidx.annotation.NonNull;
 
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Handles input related events for the {@link GodotRenderView} view.
  */
-public class GodotInputHandler implements InputManager.InputDeviceListener {
+public class GodotInputHandler implements InputManager.InputDeviceListener, SensorEventListener {
 	private static final String TAG = GodotInputHandler.class.getSimpleName();
 
 	private static final int ROTARY_INPUT_VERTICAL_AXIS = 1;
@@ -64,8 +74,9 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 	private final SparseArray<Joystick> mJoysticksDevices = new SparseArray<>(4);
 	private final HashSet<Integer> mHardwareKeyboardIds = new HashSet<>();
 
-	private final GodotRenderView mRenderView;
+	private final Godot godot;
 	private final InputManager mInputManager;
+	private final WindowManager windowManager;
 	private final GestureDetector gestureDetector;
 	private final ScaleGestureDetector scaleGestureDetector;
 	private final GodotGestureHandler godotGestureHandler;
@@ -73,17 +84,21 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 	/**
 	 * Used to decide whether mouse capture can be enabled.
 	 */
-	private int lastSeenToolType = MotionEvent.TOOL_TYPE_UNKNOWN;
+	private AtomicInteger lastSeenToolType = new AtomicInteger(MotionEvent.TOOL_TYPE_UNKNOWN);
 
-	private static int rotaryInputAxis = ROTARY_INPUT_VERTICAL_AXIS;
+	private int rotaryInputAxis = ROTARY_INPUT_VERTICAL_AXIS;
 
-	public GodotInputHandler(GodotRenderView godotView) {
-		final Context context = godotView.getView().getContext();
-		mRenderView = godotView;
+	private int cachedRotation = -1;
+	private boolean overrideVolumeButtons = false;
+
+	public GodotInputHandler(Context context, Godot godot) {
+		this.godot = godot;
 		mInputManager = (InputManager)context.getSystemService(Context.INPUT_SERVICE);
 		mInputManager.registerInputDeviceListener(this, null);
 
-		this.godotGestureHandler = new GodotGestureHandler();
+		windowManager = (WindowManager)context.getSystemService(Context.WINDOW_SERVICE);
+
+		this.godotGestureHandler = new GodotGestureHandler(this);
 		this.gestureDetector = new GestureDetector(context, godotGestureHandler);
 		this.gestureDetector.setIsLongpressEnabled(false);
 		this.scaleGestureDetector = new ScaleGestureDetector(context, godotGestureHandler);
@@ -109,10 +124,22 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 	}
 
 	/**
+	 * @return true if input must be dispatched from the render thread. If false, input is
+	 * dispatched from the UI thread.
+	 */
+	private boolean shouldDispatchInputToRenderThread() {
+		return GodotLib.shouldDispatchInputToRenderThread();
+	}
+
+	/**
 	 * On Wear OS devices, sets which axis of the mouse wheel rotary input is mapped to. This is 1 (vertical axis) by default.
 	 */
 	public void setRotaryInputAxis(int axis) {
 		rotaryInputAxis = axis;
+	}
+
+	public void setOverrideVolumeButtons(boolean value) {
+		overrideVolumeButtons = value;
 	}
 
 	boolean hasHardwareKeyboard() {
@@ -128,7 +155,8 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 	}
 
 	public boolean canCapturePointer() {
-		return lastSeenToolType == MotionEvent.TOOL_TYPE_MOUSE;
+		return lastSeenToolType.get() == MotionEvent.TOOL_TYPE_MOUSE ||
+				lastSeenToolType.get() == MotionEvent.TOOL_TYPE_UNKNOWN;
 	}
 
 	public void onPointerCaptureChange(boolean hasCapture) {
@@ -136,14 +164,6 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 	}
 
 	public boolean onKeyUp(final int keyCode, KeyEvent event) {
-		if (keyCode == KeyEvent.KEYCODE_BACK) {
-			return true;
-		}
-
-		if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-			return false;
-		}
-
 		int source = event.getSource();
 		if (isKeyEventGameDevice(source)) {
 			// Check if the device exists
@@ -151,31 +171,24 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 			if (mJoystickIds.indexOfKey(deviceId) >= 0) {
 				final int button = getGodotButton(keyCode);
 				final int godotJoyId = mJoystickIds.get(deviceId);
-				GodotLib.joybutton(godotJoyId, button, false);
+				handleJoystickButtonEvent(godotJoyId, button, false);
 			}
 		} else {
 			// getKeyCode(): The physical key that was pressed.
 			final int physical_keycode = event.getKeyCode();
 			final int unicode = event.getUnicodeChar();
 			final int key_label = event.getDisplayLabel();
-			GodotLib.key(physical_keycode, unicode, key_label, false, event.getRepeatCount() > 0);
+			handleKeyEvent(physical_keycode, unicode, key_label, false, event.getRepeatCount() > 0);
 		};
+
+		if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+			return overrideVolumeButtons;
+		}
 
 		return true;
 	}
 
 	public boolean onKeyDown(final int keyCode, KeyEvent event) {
-		if (keyCode == KeyEvent.KEYCODE_BACK) {
-			mRenderView.onBackPressed();
-			// press 'back' button should not terminate program
-			//normal handle 'back' event in game logic
-			return true;
-		}
-
-		if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-			return false;
-		}
-
 		int source = event.getSource();
 
 		final int deviceId = event.getDeviceId();
@@ -187,20 +200,24 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 			if (mJoystickIds.indexOfKey(deviceId) >= 0) {
 				final int button = getGodotButton(keyCode);
 				final int godotJoyId = mJoystickIds.get(deviceId);
-				GodotLib.joybutton(godotJoyId, button, true);
+				handleJoystickButtonEvent(godotJoyId, button, true);
 			}
 		} else {
 			final int physical_keycode = event.getKeyCode();
 			final int unicode = event.getUnicodeChar();
 			final int key_label = event.getDisplayLabel();
-			GodotLib.key(physical_keycode, unicode, key_label, true, event.getRepeatCount() > 0);
+			handleKeyEvent(physical_keycode, unicode, key_label, true, event.getRepeatCount() > 0);
+		}
+
+		if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+			return overrideVolumeButtons;
 		}
 
 		return true;
 	}
 
 	public boolean onTouchEvent(final MotionEvent event) {
-		lastSeenToolType = getEventToolType(event);
+		lastSeenToolType.set(getEventToolType(event));
 
 		this.scaleGestureDetector.onTouchEvent(event);
 		if (this.gestureDetector.onTouchEvent(event)) {
@@ -226,7 +243,7 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 	}
 
 	public boolean onGenericMotionEvent(MotionEvent event) {
-		lastSeenToolType = getEventToolType(event);
+		lastSeenToolType.set(getEventToolType(event));
 
 		if (event.isFromSource(InputDevice.SOURCE_JOYSTICK) && event.getActionMasked() == MotionEvent.ACTION_MOVE) {
 			// Check if the device exists
@@ -248,7 +265,7 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 					if (joystick.axesValues.indexOfKey(axis) < 0 || (float)joystick.axesValues.get(axis) != value) {
 						// save value to prevent repeats
 						joystick.axesValues.put(axis, value);
-						GodotLib.joyaxis(godotJoyId, i, value);
+						handleJoystickAxisEvent(godotJoyId, i, value);
 					}
 				}
 
@@ -258,7 +275,7 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 					if (joystick.hatX != hatX || joystick.hatY != hatY) {
 						joystick.hatX = hatX;
 						joystick.hatY = hatY;
-						GodotLib.joyhat(godotJoyId, hatX, hatY);
+						handleJoystickHatEvent(godotJoyId, hatX, hatY);
 					}
 				}
 				return true;
@@ -284,10 +301,12 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 		int[] deviceIds = mInputManager.getInputDeviceIds();
 		for (int deviceId : deviceIds) {
 			InputDevice device = mInputManager.getInputDevice(deviceId);
-			if (DEBUG) {
-				Log.v(TAG, String.format("init() deviceId:%d, Name:%s\n", deviceId, device.getName()));
+			if (device != null) {
+				if (DEBUG) {
+					Log.v(TAG, String.format("init() deviceId:%d, Name:%s\n", deviceId, device.getName()));
+				}
+				onInputDeviceAdded(deviceId);
 			}
-			onInputDeviceAdded(deviceId);
 		}
 	}
 
@@ -364,7 +383,7 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 		}
 		mJoysticksDevices.put(deviceId, joystick);
 
-		GodotLib.joyconnectionchanged(id, true, joystick.name);
+		handleJoystickConnectionChangedEvent(id, true, joystick.name);
 	}
 
 	@Override
@@ -378,7 +397,7 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 		final int godotJoyId = mJoystickIds.get(deviceId);
 		mJoystickIds.delete(deviceId);
 		mJoysticksDevices.delete(deviceId);
-		GodotLib.joyconnectionchanged(godotJoyId, false, "");
+		handleJoystickConnectionChangedEvent(godotJoyId, false, "");
 	}
 
 	@Override
@@ -452,7 +471,7 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 		return button;
 	}
 
-	private static int getEventToolType(MotionEvent event) {
+	static int getEventToolType(MotionEvent event) {
 		return event.getPointerCount() > 0 ? event.getToolType(0) : MotionEvent.TOOL_TYPE_UNKNOWN;
 	}
 
@@ -482,22 +501,22 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 		}
 	}
 
-	static boolean handleMotionEvent(final MotionEvent event) {
+	boolean handleMotionEvent(final MotionEvent event) {
 		return handleMotionEvent(event, event.getActionMasked());
 	}
 
-	static boolean handleMotionEvent(final MotionEvent event, int eventActionOverride) {
+	boolean handleMotionEvent(final MotionEvent event, int eventActionOverride) {
 		return handleMotionEvent(event, eventActionOverride, false);
 	}
 
-	static boolean handleMotionEvent(final MotionEvent event, int eventActionOverride, boolean doubleTap) {
+	boolean handleMotionEvent(final MotionEvent event, int eventActionOverride, boolean doubleTap) {
 		if (isMouseEvent(event)) {
 			return handleMouseEvent(event, eventActionOverride, doubleTap);
 		}
 		return handleTouchEvent(event, eventActionOverride, doubleTap);
 	}
 
-	private static float getEventTiltX(MotionEvent event) {
+	static float getEventTiltX(MotionEvent event) {
 		// Orientation is returned as a radian value between 0 to pi clockwise or 0 to -pi counterclockwise.
 		final float orientation = event.getOrientation();
 
@@ -510,7 +529,7 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 		return (float)-Math.sin(orientation) * tiltMult;
 	}
 
-	private static float getEventTiltY(MotionEvent event) {
+	static float getEventTiltY(MotionEvent event) {
 		// Orientation is returned as a radian value between 0 to pi clockwise or 0 to -pi counterclockwise.
 		final float orientation = event.getOrientation();
 
@@ -523,19 +542,19 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 		return (float)Math.cos(orientation) * tiltMult;
 	}
 
-	static boolean handleMouseEvent(final MotionEvent event) {
+	boolean handleMouseEvent(final MotionEvent event) {
 		return handleMouseEvent(event, event.getActionMasked());
 	}
 
-	static boolean handleMouseEvent(final MotionEvent event, int eventActionOverride) {
+	boolean handleMouseEvent(final MotionEvent event, int eventActionOverride) {
 		return handleMouseEvent(event, eventActionOverride, false);
 	}
 
-	static boolean handleMouseEvent(final MotionEvent event, int eventActionOverride, boolean doubleTap) {
+	boolean handleMouseEvent(final MotionEvent event, int eventActionOverride, boolean doubleTap) {
 		return handleMouseEvent(event, eventActionOverride, event.getButtonState(), doubleTap);
 	}
 
-	static boolean handleMouseEvent(final MotionEvent event, int eventActionOverride, int buttonMaskOverride, boolean doubleTap) {
+	boolean handleMouseEvent(final MotionEvent event, int eventActionOverride, int buttonMaskOverride, boolean doubleTap) {
 		final float x = event.getX();
 		final float y = event.getY();
 
@@ -564,11 +583,16 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 		return handleMouseEvent(eventActionOverride, buttonMaskOverride, x, y, horizontalFactor, verticalFactor, doubleTap, sourceMouseRelative, pressure, getEventTiltX(event), getEventTiltY(event));
 	}
 
-	static boolean handleMouseEvent(int eventAction, boolean sourceMouseRelative) {
+	boolean handleMouseEvent(int eventAction, boolean sourceMouseRelative) {
 		return handleMouseEvent(eventAction, 0, 0f, 0f, 0f, 0f, false, sourceMouseRelative, 1f, 0f, 0f);
 	}
 
-	static boolean handleMouseEvent(int eventAction, int buttonsMask, float x, float y, float deltaX, float deltaY, boolean doubleClick, boolean sourceMouseRelative, float pressure, float tiltX, float tiltY) {
+	boolean handleMouseEvent(int eventAction, int buttonsMask, float x, float y, float deltaX, float deltaY, boolean doubleClick, boolean sourceMouseRelative, float pressure, float tiltX, float tiltY) {
+		InputEventRunnable runnable = InputEventRunnable.obtain();
+		if (runnable == null) {
+			return false;
+		}
+
 		// Fix the buttonsMask
 		switch (eventAction) {
 			case MotionEvent.ACTION_CANCEL:
@@ -596,38 +620,31 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 			case MotionEvent.ACTION_HOVER_MOVE:
 			case MotionEvent.ACTION_MOVE:
 			case MotionEvent.ACTION_SCROLL: {
-				GodotLib.dispatchMouseEvent(eventAction, buttonsMask, x, y, deltaX, deltaY, doubleClick, sourceMouseRelative, pressure, tiltX, tiltY);
+				runnable.setMouseEvent(eventAction, buttonsMask, x, y, deltaX, deltaY, doubleClick, sourceMouseRelative, pressure, tiltX, tiltY);
+				dispatchInputEventRunnable(runnable);
 				return true;
 			}
 		}
 		return false;
 	}
 
-	static boolean handleTouchEvent(final MotionEvent event) {
+	boolean handleTouchEvent(final MotionEvent event) {
 		return handleTouchEvent(event, event.getActionMasked());
 	}
 
-	static boolean handleTouchEvent(final MotionEvent event, int eventActionOverride) {
+	boolean handleTouchEvent(final MotionEvent event, int eventActionOverride) {
 		return handleTouchEvent(event, eventActionOverride, false);
 	}
 
-	static boolean handleTouchEvent(final MotionEvent event, int eventActionOverride, boolean doubleTap) {
-		final int pointerCount = event.getPointerCount();
-		if (pointerCount == 0) {
+	boolean handleTouchEvent(final MotionEvent event, int eventActionOverride, boolean doubleTap) {
+		if (event.getPointerCount() == 0) {
 			return true;
 		}
 
-		final float[] positions = new float[pointerCount * 6]; // pointerId1, x1, y1, pressure1, tiltX1, tiltY1, pointerId2, etc...
-
-		for (int i = 0; i < pointerCount; i++) {
-			positions[i * 6 + 0] = event.getPointerId(i);
-			positions[i * 6 + 1] = event.getX(i);
-			positions[i * 6 + 2] = event.getY(i);
-			positions[i * 6 + 3] = event.getPressure(i);
-			positions[i * 6 + 4] = getEventTiltX(event);
-			positions[i * 6 + 5] = getEventTiltY(event);
+		InputEventRunnable runnable = InputEventRunnable.obtain();
+		if (runnable == null) {
+			return false;
 		}
-		final int actionPointerId = event.getPointerId(event.getActionIndex());
 
 		switch (eventActionOverride) {
 			case MotionEvent.ACTION_DOWN:
@@ -636,10 +653,149 @@ public class GodotInputHandler implements InputManager.InputDeviceListener {
 			case MotionEvent.ACTION_MOVE:
 			case MotionEvent.ACTION_POINTER_UP:
 			case MotionEvent.ACTION_POINTER_DOWN: {
-				GodotLib.dispatchTouchEvent(eventActionOverride, actionPointerId, pointerCount, positions, doubleTap);
+				runnable.setTouchEvent(event, eventActionOverride, doubleTap);
+				dispatchInputEventRunnable(runnable);
 				return true;
 			}
 		}
 		return false;
+	}
+
+	void handleMagnifyEvent(float x, float y, float factor) {
+		InputEventRunnable runnable = InputEventRunnable.obtain();
+		if (runnable == null) {
+			return;
+		}
+
+		runnable.setMagnifyEvent(x, y, factor);
+		dispatchInputEventRunnable(runnable);
+	}
+
+	void handlePanEvent(float x, float y, float deltaX, float deltaY) {
+		InputEventRunnable runnable = InputEventRunnable.obtain();
+		if (runnable == null) {
+			return;
+		}
+
+		runnable.setPanEvent(x, y, deltaX, deltaY);
+		dispatchInputEventRunnable(runnable);
+	}
+
+	private void handleJoystickButtonEvent(int device, int button, boolean pressed) {
+		InputEventRunnable runnable = InputEventRunnable.obtain();
+		if (runnable == null) {
+			return;
+		}
+
+		runnable.setJoystickButtonEvent(device, button, pressed);
+		dispatchInputEventRunnable(runnable);
+	}
+
+	private void handleJoystickAxisEvent(int device, int axis, float value) {
+		InputEventRunnable runnable = InputEventRunnable.obtain();
+		if (runnable == null) {
+			return;
+		}
+
+		runnable.setJoystickAxisEvent(device, axis, value);
+		dispatchInputEventRunnable(runnable);
+	}
+
+	private void handleJoystickHatEvent(int device, int hatX, int hatY) {
+		InputEventRunnable runnable = InputEventRunnable.obtain();
+		if (runnable == null) {
+			return;
+		}
+
+		runnable.setJoystickHatEvent(device, hatX, hatY);
+		dispatchInputEventRunnable(runnable);
+	}
+
+	private void handleJoystickConnectionChangedEvent(int device, boolean connected, String name) {
+		InputEventRunnable runnable = InputEventRunnable.obtain();
+		if (runnable == null) {
+			return;
+		}
+
+		runnable.setJoystickConnectionChangedEvent(device, connected, name);
+		dispatchInputEventRunnable(runnable);
+	}
+
+	void handleKeyEvent(int physicalKeycode, int unicode, int keyLabel, boolean pressed, boolean echo) {
+		InputEventRunnable runnable = InputEventRunnable.obtain();
+		if (runnable == null) {
+			return;
+		}
+
+		runnable.setKeyEvent(physicalKeycode, unicode, keyLabel, pressed, echo);
+		dispatchInputEventRunnable(runnable);
+	}
+
+	private void dispatchInputEventRunnable(@NonNull InputEventRunnable runnable) {
+		if (shouldDispatchInputToRenderThread()) {
+			godot.runOnRenderThread(runnable);
+		} else {
+			runnable.run();
+		}
+	}
+
+	@Override
+	public void onSensorChanged(SensorEvent event) {
+		final float[] values = event.values;
+		if (values == null || values.length != 3) {
+			return;
+		}
+
+		InputEventRunnable runnable = InputEventRunnable.obtain();
+		if (runnable == null) {
+			return;
+		}
+
+		if (cachedRotation == -1) {
+			updateCachedRotation();
+		}
+
+		float rotatedValue0 = 0f;
+		float rotatedValue1 = 0f;
+		float rotatedValue2 = 0f;
+		switch (cachedRotation) {
+			case Surface.ROTATION_0:
+				rotatedValue0 = values[0];
+				rotatedValue1 = values[1];
+				rotatedValue2 = values[2];
+				break;
+
+			case Surface.ROTATION_90:
+				rotatedValue0 = -values[1];
+				rotatedValue1 = values[0];
+				rotatedValue2 = values[2];
+				break;
+
+			case Surface.ROTATION_180:
+				rotatedValue0 = -values[0];
+				rotatedValue1 = -values[1];
+				rotatedValue2 = values[2];
+				break;
+
+			case Surface.ROTATION_270:
+				rotatedValue0 = values[1];
+				rotatedValue1 = -values[0];
+				rotatedValue2 = values[2];
+				break;
+		}
+
+		runnable.setSensorEvent(event.sensor.getType(), rotatedValue0, rotatedValue1, rotatedValue2);
+		godot.runOnRenderThread(runnable);
+	}
+
+	@Override
+	public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+
+	private void updateCachedRotation() {
+		cachedRotation = windowManager.getDefaultDisplay().getRotation();
+	}
+
+	public void onConfigurationChanged(Configuration newConfig) {
+		updateCachedRotation();
 	}
 }

@@ -81,22 +81,6 @@ void NativeMenuWindows::_menu_activate(HMENU p_menu, int p_index) const {
 				if (GetMenuItemInfoW(md->menu, p_index, true, &item)) {
 					MenuItemData *item_data = (MenuItemData *)item.dwItemData;
 					if (item_data) {
-						if (item_data->max_states > 0) {
-							item_data->state++;
-							if (item_data->state >= item_data->max_states) {
-								item_data->state = 0;
-							}
-						}
-
-						if (item_data->checkable_type == CHECKABLE_TYPE_CHECK_BOX) {
-							if ((item.fState & MFS_CHECKED) == MFS_CHECKED) {
-								item.fState &= ~MFS_CHECKED;
-							} else {
-								item.fState |= MFS_CHECKED;
-							}
-							SetMenuItemInfoW(md->menu, p_index, true, &item);
-						}
-
 						if (item_data->callback.is_valid()) {
 							Variant ret;
 							Callable::CallError ce;
@@ -174,7 +158,7 @@ Size2 NativeMenuWindows::get_size(const RID &p_rid) const {
 	int count = GetMenuItemCount(md->menu);
 	for (int i = 0; i < count; i++) {
 		RECT rect;
-		if (GetMenuItemRect(NULL, md->menu, i, &rect)) {
+		if (GetMenuItemRect(nullptr, md->menu, i, &rect)) {
 			size.x = MAX(size.x, rect.right - rect.left);
 			size.y += rect.bottom - rect.top;
 		}
@@ -193,6 +177,16 @@ void NativeMenuWindows::popup(const RID &p_rid, const Vector2i &p_position) {
 	}
 	SetForegroundWindow(hwnd);
 	TrackPopupMenuEx(md->menu, flags, p_position.x, p_position.y, hwnd, nullptr);
+
+	if (md->close_cb.is_valid()) {
+		Variant ret;
+		Callable::CallError ce;
+		md->close_cb.callp(nullptr, 0, ret, ce);
+		if (ce.error != Callable::CallError::CALL_OK) {
+			ERR_PRINT(vformat("Failed to execute popup close callback: %s.", Variant::get_callable_error_text(md->close_cb, nullptr, 0, ce)));
+		}
+	}
+
 	PostMessage(hwnd, WM_NULL, 0, 0);
 }
 
@@ -216,12 +210,17 @@ Callable NativeMenuWindows::get_popup_open_callback(const RID &p_rid) const {
 }
 
 void NativeMenuWindows::set_popup_close_callback(const RID &p_rid, const Callable &p_callback) {
-	// Not supported.
+	MenuData *md = menus.get_or_null(p_rid);
+	ERR_FAIL_NULL(md);
+
+	md->close_cb = p_callback;
 }
 
 Callable NativeMenuWindows::get_popup_close_callback(const RID &p_rid) const {
-	// Not supported.
-	return Callable();
+	const MenuData *md = menus.get_or_null(p_rid);
+	ERR_FAIL_NULL_V(md, Callable());
+
+	return md->close_cb;
 }
 
 void NativeMenuWindows::set_minimum_width(const RID &p_rid, float p_width) {
@@ -619,9 +618,12 @@ bool NativeMenuWindows::is_item_checked(const RID &p_rid, int p_idx) const {
 	MENUITEMINFOW item;
 	ZeroMemory(&item, sizeof(item));
 	item.cbSize = sizeof(item);
-	item.fMask = MIIM_STATE;
+	item.fMask = MIIM_STATE | MIIM_DATA;
 	if (GetMenuItemInfoW(md->menu, p_idx, true, &item)) {
-		return (item.fState & MFS_CHECKED) == MFS_CHECKED;
+		MenuItemData *item_data = (MenuItemData *)item.dwItemData;
+		if (item_data) {
+			return item_data->checked;
+		}
 	}
 	return false;
 }
@@ -861,12 +863,16 @@ void NativeMenuWindows::set_item_checked(const RID &p_rid, int p_idx, bool p_che
 	MENUITEMINFOW item;
 	ZeroMemory(&item, sizeof(item));
 	item.cbSize = sizeof(item);
-	item.fMask = MIIM_STATE;
+	item.fMask = MIIM_STATE | MIIM_DATA;
 	if (GetMenuItemInfoW(md->menu, p_idx, true, &item)) {
-		if (p_checked) {
-			item.fState |= MFS_CHECKED;
-		} else {
-			item.fState &= ~MFS_CHECKED;
+		MenuItemData *item_data = (MenuItemData *)item.dwItemData;
+		if (item_data) {
+			item_data->checked = p_checked;
+			if (p_checked) {
+				item.fState |= MFS_CHECKED;
+			} else {
+				item.fState &= ~MFS_CHECKED;
+			}
 		}
 		SetMenuItemInfoW(md->menu, p_idx, true, &item);
 	}
@@ -1001,7 +1007,7 @@ void NativeMenuWindows::set_item_submenu(const RID &p_rid, int p_idx, const RID 
 		if (p_submenu_rid.is_valid()) {
 			item.hSubMenu = md_sub->menu;
 		} else {
-			item.hSubMenu = 0;
+			item.hSubMenu = nullptr;
 		}
 		SetMenuItemInfoW(md->menu, p_idx, true, &item);
 	}
@@ -1104,7 +1110,7 @@ void NativeMenuWindows::set_item_icon(const RID &p_rid, int p_idx, const Ref<Tex
 				item_data->bmp = _make_bitmap(item_data->img);
 			} else {
 				item_data->img = Ref<Image>();
-				item_data->bmp = 0;
+				item_data->bmp = nullptr;
 			}
 			item.hbmpItem = item_data->bmp;
 			SetMenuItemInfoW(md->menu, p_idx, true, &item);
