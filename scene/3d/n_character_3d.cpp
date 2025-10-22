@@ -279,6 +279,11 @@ bool NCharacter3D::is_walkable_ground(PhysicsServer3D::MotionResult p_result) co
 	return false;
 }
 
+Node3D* NCharacter3D::_get_platform() {
+	return Object::cast_to<Node3D>(ObjectDB::get_instance(platform_object_id));
+}
+
+
 void NCharacter3D::_move_and_slide_grounded_motion(Vector3 motion, bool p_was_on_floor) {
 	Vector3 motion_slide_up = motion.slide(up_direction);
 	Vector3 prev_floor_normal = floor_normal;
@@ -1196,6 +1201,7 @@ void NCharacter3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_slide_collision_count"), &NCharacter3D::get_slide_collision_count);
 	ClassDB::bind_method(D_METHOD("get_slide_collision", "slide_idx"), &NCharacter3D::_get_slide_collision);
 	ClassDB::bind_method(D_METHOD("get_last_slide_collision"), &NCharacter3D::_get_last_slide_collision);
+	ClassDB::bind_method(D_METHOD("get_platform"), &NCharacter3D::_get_platform);
 
 	ClassDB::bind_method(D_METHOD("get_capsule_base"), &NCharacter3D::get_capsule_base);
 

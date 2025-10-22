@@ -194,6 +194,9 @@ private:
 
 	bool is_walkable_ground(PhysicsServer3D::MotionResult p_result) const;
 
+	// get the floor i'm walking on
+	Node3D* _get_platform();
+
 	void _move_and_slide_grounded_motion(Vector3 motion, bool p_was_on_floor);
 
 	bool move_and_collide_with_step_up(const PhysicsServer3D::MotionParameters &p_parameters, PhysicsServer3D::MotionResult &r_result, bool p_test_only = false, bool p_cancel_sliding = true);
