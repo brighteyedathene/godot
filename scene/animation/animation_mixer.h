@@ -92,6 +92,8 @@ public:
 		Animation::LoopedFlag looped_flag = Animation::LOOPED_FLAG_NONE;
 		real_t weight = 0.0;
 		Vector<real_t> track_weights;
+		bool mute_method_tracks = false;
+		bool skip_normalization = false;
 	};
 
 	struct AnimationInstance {
@@ -99,7 +101,7 @@ public:
 		PlaybackInfo playback_info;
 	};
 
-protected:
+public:
 	/* ---- Data lists ---- */
 	LocalVector<AnimationLibraryData> animation_libraries;
 	AHashMap<StringName, AnimationData> animation_set; // HashMap<Library name + Animation name, AnimationData>

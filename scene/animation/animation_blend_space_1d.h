@@ -113,6 +113,7 @@ public:
 	bool is_using_sync() const;
 
 	virtual NodeTimeInfo _process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only = false) override;
+	NodeTimeInfo special_process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only = false);
 	String get_caption() const override;
 
 	Ref<AnimationNode> get_child_by_name(const StringName &p_name) const override;

@@ -250,6 +250,14 @@ class AnimationNodeBlend2 : public AnimationNodeSync {
 	StringName blend_amount = PNAME("blend_amount");
 
 public:
+
+	bool mute_lightweight_methods = true;
+	void set_mute_lightweight_methods(bool p_value) { mute_lightweight_methods = p_value; };
+	bool get_mute_lightweight_methods() { return mute_lightweight_methods; };
+
+	static void _bind_methods();
+
+
 	virtual void get_parameter_list(List<PropertyInfo> *r_list) const override;
 	virtual Variant get_parameter_default_value(const StringName &p_parameter) const override;
 

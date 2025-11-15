@@ -370,7 +370,7 @@ void NCharacter3D::_move_and_slide_grounded_motion(Vector3 motion, bool p_was_on
 					Vector3 horizontal_normal = wall_normal.slide(up_direction).normalized();
 					real_t motion_angle = Math::abs(Math::acos(-horizontal_normal.dot(horizontal_motion.normalized())));
 
-					// Avoid to move forward on a wall if floor_block_on_wall is true.
+					// Avoid moving forward on a wall if floor_block_on_wall is true.
 					// Applies only when the motion angle is under 90 degrees,
 					// in order to avoid blocking lateral motion along a wall.
 					if (motion_angle < .5 * Math_PI) {

@@ -120,7 +120,8 @@ void AnimationMixer::_get_property_list(List<PropertyInfo> *p_list) const {
 
 void AnimationMixer::_validate_property(PropertyInfo &p_property) const {
 #ifdef TOOLS_ENABLED
-	if (editing && (p_property.name == "active" || p_property.name == "deterministic" || p_property.name == "root_motion_track")) {
+	//if (editing && (p_property.name == "active" || p_property.name == "deterministic" || p_property.name == "root_motion_track")) {
+	if (editing && (p_property.name == "active" || p_property.name == "root_motion_track")) {
 		p_property.usage |= PROPERTY_USAGE_READ_ONLY;
 	}
 #endif // TOOLS_ENABLED
@@ -1201,7 +1202,7 @@ void AnimationMixer::_blend_process(double p_delta, bool p_update_only) {
 			int blend_idx = track->blend_idx;
 			ERR_CONTINUE(blend_idx < 0 || blend_idx >= track_count);
 			real_t blend = blend_idx < track_weights_count ? track_weights_ptr[blend_idx] * weight : weight;
-			if (!deterministic) {
+			if (!deterministic && !ai.playback_info.skip_normalization) {
 				// If non-deterministic, do normalization.
 				// It would be better to make this if statement outside the for loop, but come here since too much code...
 				if (Math::is_zero_approx(track->total_weight)) {
@@ -1646,6 +1647,9 @@ void AnimationMixer::_blend_process(double p_delta, bool p_update_only) {
 					}
 #endif // TOOLS_ENABLED
 					if (p_update_only || Math::is_zero_approx(blend)) {
+						continue;
+					}
+					if (ai.playback_info.mute_method_tracks) { // fiddling with track weights is cringe and makes no sense
 						continue;
 					}
 					TrackCacheMethod *t = static_cast<TrackCacheMethod *>(track);

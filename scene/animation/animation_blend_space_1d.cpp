@@ -278,6 +278,8 @@ void AnimationNodeBlendSpace1D::_add_blend_point(int p_index, const Ref<Animatio
 }
 
 AnimationNode::NodeTimeInfo AnimationNodeBlendSpace1D::_process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only) {
+	return special_process(p_playback_info, p_test_only);
+
 	if (!blend_points_used) {
 		return NodeTimeInfo();
 	}
@@ -417,6 +419,247 @@ AnimationNode::NodeTimeInfo AnimationNodeBlendSpace1D::_process(const AnimationM
 	set_parameter(closest, cur_closest);
 	return mind;
 }
+
+
+AnimationNode::NodeTimeInfo AnimationNodeBlendSpace1D::special_process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only)
+{
+	if (!blend_points_used)
+	{
+		return NodeTimeInfo();
+	}
+
+	AnimationMixer::PlaybackInfo pi = p_playback_info;
+	bool parent_muted = pi.mute_method_tracks;
+
+	if (blend_points_used == 1)
+	{
+		// only one point available, just play that animation
+		pi.weight = 1.0;
+		return blend_node(blend_points[0].node, blend_points[0].name, pi, FILTER_IGNORE, true, p_test_only);
+	}
+
+	double blend_pos = get_parameter(blend_position);
+	int cur_closest = get_parameter(closest);
+	NodeTimeInfo mind;
+
+	if (blend_mode == BLEND_MODE_INTERPOLATED)
+	{
+		int point_lower = -1;
+		float pos_lower = 0.0;
+		int point_higher = -1;
+		float pos_higher = 0.0;
+
+		// find the closest two points to blend between
+		for (int i = 0; i < blend_points_used; i++)
+		{
+			float pos = blend_points[i].position;
+
+			if (pos <= blend_pos)
+			{
+				if (point_lower == -1 || pos > pos_lower)
+				{
+					point_lower = i;
+					pos_lower = pos;
+				}
+			}
+			else if (point_higher == -1 || pos < pos_higher)
+			{
+				point_higher = i;
+				pos_higher = pos;
+			}
+		}
+
+		// fill in weights
+		float weights[MAX_BLEND_POINTS] = {};
+		int heaviest_index = -1;
+		if (point_lower == -1 && point_higher != -1)
+		{
+			// we are on the left side, no other point to the left
+			// we just play the next point.
+
+			weights[point_higher] = 1.0;
+			heaviest_index = point_higher;
+		}
+		else if (point_higher == -1)
+		{
+			// we are on the right side, no other point to the right
+			// we just play the previous point
+
+			weights[point_lower] = 1.0;
+			heaviest_index = point_lower;
+		}
+		else
+		{
+			// we are between two points.
+			// figure out weights, then blend the animations
+
+			float distance_between_points = pos_higher - pos_lower;
+
+			float current_pos_inbetween = blend_pos - pos_lower;
+
+			float blend_percentage = current_pos_inbetween / distance_between_points;
+
+			float blend_lower = 1.0 - blend_percentage;
+			float blend_higher = blend_percentage;
+
+			weights[point_lower] = blend_lower;
+			weights[point_higher] = blend_higher;
+			heaviest_index = (blend_lower > blend_higher) ? point_lower : point_higher;
+		}
+
+		// do something about blending time? need a different delta for each node i think.
+		NodeTimeInfo ntis[2] = {};
+		int points[2] = { point_lower, point_higher };
+		float weighted_progress = 0.0f;
+		for (int i = 0; i < 2; i++)
+		{
+			int point_index = points[i];
+			if (point_index == -1)
+			{
+				continue;
+			}
+			// test blending to see how far this animation would progress
+			// then use that to calculate weighted progress overall
+			// there's basically no other way to get NTI except by blending.
+			pi.weight = weights[point_index];
+			ntis[i] = blend_node(blend_points[point_index].node, blend_points[point_index].name, pi, FILTER_IGNORE, true, true/*test_only*/);
+
+			NodeTimeInfo& current_nti = ntis[i];
+			if (current_nti.position - current_nti.delta < 0.0)
+			{
+				current_nti.position += current_nti.length;
+			}
+			ntis[i] = current_nti;
+			float progress = current_nti.position / current_nti.length;
+			//print_line("[" + itos(point_index) + "] will_end: " + itos(ntis[i].will_end) + " progress: " + rtos(progress) + " pos: " + rtos(ntis[i].position) + " len: " + rtos(ntis[i].length) + " delta: " + rtos(ntis[i].delta));
+			weighted_progress += pi.weight * progress;
+
+		}
+		// now that I have weighted progress, I need to recalculate whatever delta it takes to reach that progress on each anim.
+		float deltas[2] = { 0.0f, 0.0f };
+		for (int i = 0; i < 2; i++)
+		{
+			int point_index = points[i];
+			if (point_index == -1) {
+				continue;
+			}
+			float weighted_position = weighted_progress * ntis[i].length;
+			float previous_position = ntis[i].position - ntis[i].delta;
+			deltas[i] = weighted_position - previous_position;
+		}
+
+		// cache this because i'm going to change delta for expressed nodes, but i don't think i want to for unexpressed.
+		// maybe it doesn't even matter though
+		AnimationMixer::PlaybackInfo original_pi = pi;
+
+		// actually blend the animations now
+		bool first = true;
+		double max_weight = 0.0;
+		for (int i = 0; i < blend_points_used; i++)
+		{
+			// reset delta in case this isn't one of the expressed nodes
+			pi = original_pi;
+
+			pi.mute_method_tracks = parent_muted || (heaviest_index != i); // mute methods for lightweights
+
+			if (i == point_lower)
+			{
+				pi.delta = deltas[0];
+			}
+			else if (i == point_higher)
+			{
+				pi.delta = deltas[1];
+			}
+
+			if (i == point_lower || i == point_higher)
+			{
+				pi.weight = weights[i];
+				NodeTimeInfo t = blend_node(blend_points[i].node, blend_points[i].name, pi, FILTER_IGNORE, true, p_test_only);
+				if (first || pi.weight > max_weight)
+				{
+					max_weight = pi.weight;
+					mind = t;
+					first = false;
+				}
+
+				float prog = t.position / t.length;
+				//print_line("pi.time: " + rtos(original_pi.time) + " [" + itos(i) + "] progress: " + rtos(prog) + " time : " + rtos(t.position) + " length : " + rtos(t.length) + " delta : " + rtos(t.delta));
+			}
+			else if (sync)
+			{
+				pi.weight = 0;
+				blend_node(blend_points[i].node, blend_points[i].name, pi, FILTER_IGNORE, true, p_test_only);
+			}
+		}
+	}
+	else
+	{
+		int new_closest = -1;
+		double new_closest_dist = 1e20;
+
+		for (int i = 0; i < blend_points_used; i++)
+		{
+			double d = abs(blend_points[i].position - blend_pos);
+			if (d < new_closest_dist)
+			{
+				new_closest = i;
+				new_closest_dist = d;
+			}
+		}
+
+		if (new_closest != cur_closest && new_closest != -1)
+		{
+			if (blend_mode == BLEND_MODE_DISCRETE_CARRY && cur_closest != -1)
+			{
+				NodeTimeInfo from;
+				// For ping-pong loop.
+				Ref<AnimationNodeAnimation> na_c = static_cast<Ref<AnimationNodeAnimation>>(blend_points[cur_closest].node);
+				Ref<AnimationNodeAnimation> na_n = static_cast<Ref<AnimationNodeAnimation>>(blend_points[new_closest].node);
+				if (na_c.is_valid() && na_n.is_valid())
+				{
+					na_n->process_state = process_state;
+					na_c->process_state = process_state;
+
+					na_n->set_backward(na_c->is_backward());
+
+					na_n = nullptr;
+					na_c = nullptr;
+				}
+				// See how much animation remains.
+				pi.seeked = false;
+				pi.weight = 0;
+				from = blend_node(blend_points[cur_closest].node, blend_points[cur_closest].name, pi, FILTER_IGNORE, true, true);
+				pi.time = from.position;
+			}
+			pi.seeked = true;
+			pi.weight = 1.0;
+			mind = blend_node(blend_points[new_closest].node, blend_points[new_closest].name, pi, FILTER_IGNORE, true, p_test_only);
+			cur_closest = new_closest;
+		}
+		else
+		{
+			pi.weight = 1.0;
+			mind = blend_node(blend_points[cur_closest].node, blend_points[cur_closest].name, pi, FILTER_IGNORE, true, p_test_only);
+		}
+
+		if (sync)
+		{
+			pi = p_playback_info;
+			pi.weight = 0;
+			for (int i = 0; i < blend_points_used; i++)
+			{
+				if (i != cur_closest)
+				{
+					blend_node(blend_points[i].node, blend_points[i].name, pi, FILTER_IGNORE, true, p_test_only);
+				}
+			}
+		}
+	}
+
+	set_parameter(closest, cur_closest);
+	return mind;
+}
+
 
 String AnimationNodeBlendSpace1D::get_caption() const {
 	return "BlendSpace1D";

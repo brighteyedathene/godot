@@ -455,6 +455,7 @@ AnimationNode::NodeTimeInfo AnimationNodeBlendSpace2D::_process(const AnimationM
 	NodeTimeInfo mind; //time of min distance point
 
 	AnimationMixer::PlaybackInfo pi = p_playback_info;
+	bool parent_muted = pi.mute_method_tracks;
 
 	if (blend_mode == BLEND_MODE_INTERPOLATED) {
 		if (triangles.is_empty()) {
@@ -509,11 +510,26 @@ AnimationNode::NodeTimeInfo AnimationNodeBlendSpace2D::_process(const AnimationM
 			triangle_points[j] = get_triangle_point(blend_triangle, j);
 		}
 
-		first = true;
+		// find the heaviest index so i can mute methods on the lightweights
+		float heaviest_weight = 0.f;
+		float heaviest_index = -1;
+		for (int i = 0; i < 3; i++)
+		{
+			if (blend_weights[i] > heaviest_weight)
+			{
+				heaviest_weight = blend_weights[i];
+				heaviest_index = triangle_points[i];
+			}
+		}
 
+		first = true;
 		double max_weight = 0.0;
 		for (int i = 0; i < blend_points_used; i++) {
 			bool found = false;
+
+			// mute tracks if they're not the heaviest
+			pi.mute_method_tracks = parent_muted || (i != heaviest_index);
+
 			for (int j = 0; j < 3; j++) {
 				if (i == triangle_points[j]) {
 					//blend with the given weight

@@ -1012,6 +1012,14 @@ AnimationNodeAdd3::AnimationNodeAdd3() {
 
 /////////////////////////////////////////////
 
+void AnimationNodeBlend2::_bind_methods()
+{
+	ClassDB::bind_method(D_METHOD("set_mute_lightweight_methods", "mute"), &AnimationNodeBlend2::set_mute_lightweight_methods);
+	ClassDB::bind_method(D_METHOD("get_mute_lightweight_methods"), &AnimationNodeBlend2::get_mute_lightweight_methods);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "mute_lightweight_methods"), "set_mute_lightweight_methods", "get_mute_lightweight_methods");
+}
+
+
 void AnimationNodeBlend2::get_parameter_list(List<PropertyInfo> *r_list) const {
 	AnimationNode::get_parameter_list(r_list);
 	r_list->push_back(PropertyInfo(Variant::FLOAT, blend_amount, PROPERTY_HINT_RANGE, "0,1,0.01,or_less,or_greater"));
@@ -1032,11 +1040,15 @@ String AnimationNodeBlend2::get_caption() const {
 
 AnimationNode::NodeTimeInfo AnimationNodeBlend2::_process(const AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only) {
 	double amount = get_parameter(blend_amount);
-
+	
 	AnimationMixer::PlaybackInfo pi = p_playback_info;
+	bool parent_muted = pi.mute_method_tracks;
+
 	pi.weight = 1.0 - amount;
+	pi.mute_method_tracks = parent_muted || ((amount > 0.5f) && mute_lightweight_methods);
 	NodeTimeInfo nti0 = blend_input(0, pi, FILTER_BLEND, sync, p_test_only);
 	pi.weight = amount;
+	pi.mute_method_tracks = parent_muted || ((amount <= 0.5f) && mute_lightweight_methods);
 	NodeTimeInfo nti1 = blend_input(1, pi, FILTER_PASS, sync, p_test_only);
 
 	return amount > 0.5 ? nti1 : nti0; // Hacky but good enough.

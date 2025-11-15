@@ -40,6 +40,7 @@
 #include "scene/animation/animation_node_extension.h"
 #include "scene/animation/animation_node_state_machine.h"
 #include "scene/animation/animation_player.h"
+#include "scene/animation/n_animation_player.h"
 #include "scene/animation/animation_tree.h"
 #include "scene/animation/tween.h"
 #include "scene/audio/audio_stream_player.h"
@@ -544,6 +545,21 @@ void register_scene_types() {
 
 	GDREGISTER_ABSTRACT_CLASS(AnimationMixer);
 	GDREGISTER_CLASS(AnimationPlayer);
+
+	// Custom animation classes
+	GDREGISTER_CLASS(NAnimationPlayer);
+	GDREGISTER_CLASS(NAnimationMode);
+	GDREGISTER_CLASS(NAnimationMode_Locomotion);
+	GDREGISTER_CLASS(NAnimationMode_Locomotion1D);
+	GDREGISTER_CLASS(NAnimationMode_Locomotion2D);
+	GDREGISTER_CLASS(NAnimationMode_Blend);
+	GDREGISTER_CLASS(NAnimationMode_OneShot);
+
+	GDREGISTER_CLASS(NAnimationAsset_Locomotion);
+	GDREGISTER_CLASS(NAnimationAsset_Locomotion1D);
+	GDREGISTER_CLASS(NAnimationAsset_Locomotion2D);
+	//
+
 	GDREGISTER_CLASS(AnimationTree);
 	GDREGISTER_CLASS(AnimationNode);
 	GDREGISTER_CLASS(AnimationRootNode);

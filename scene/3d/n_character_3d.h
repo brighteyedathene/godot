@@ -113,7 +113,9 @@ public:
 	void set_platform_on_leave(PlatformOnLeave p_on_leave_velocity);
 	PlatformOnLeave get_platform_on_leave() const;
 
-	
+	real_t get_slide_damping_factor() const { return slide_damping_factor; };
+	void set_slide_damping_factor(real_t p_value) { slide_damping_factor = p_value; };
+
 	bool get_step_enabled() const { return step_enabled; };
 	void set_step_enabled(bool p_enabled) { step_enabled = p_enabled; };
 
@@ -177,6 +179,7 @@ private:
 	Vector3 previous_position;
 	Vector3 real_velocity;
 
+	float slide_damping_factor = 0.8f;
 	bool step_enabled = false;
 	real_t max_step_height = 0.0;
 	real_t max_step_lookahead = 0.2;
